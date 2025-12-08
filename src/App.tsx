@@ -1,35 +1,49 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from '/vite.svg'
-import './App.css'
+import React, { useState, useEffect } from 'react';
+import LoginForm from './assets/components/Login.tsx';
+import Dashboard from './assets/components/Dashboard.tsx';
 
-function App() {
-  const [count, setCount] = useState(0)
+const App: React.FC = () => {
+    const [isLoggedIn, setIsLoggedIn] = useState(false);
+    const [username, setUsername] = useState('');
 
-  return (
-    <>
-      <div>
-        <a href="https://vite.dev" target="_blank">
-          <img src={viteLogo} className="logo" alt="Vite logo" />
-        </a>
-        <a href="https://react.dev" target="_blank">
-          <img src={reactLogo} className="logo react" alt="React logo" />
-        </a>
-      </div>
-      <h1>Vite + React</h1>
-      <div className="card">
-        <button onClick={() => setCount((count) => count + 1)}>
-          count is {count}
-        </button>
-        <p>
-          Edit <code>src/App.tsx</code> and save to test HMR
-        </p>
-      </div>
-      <p className="read-the-docs">
-        Click on the Vite and React logos to learn more
-      </p>
-    </>
-  )
-}
+    useEffect(() => {
+        const savedAuth = localStorage.getItem('isAuthenticated');
+        const savedUsername = localStorage.getItem('username');
 
-export default App
+        if (savedAuth === 'true' && savedUsername) {
+            setIsLoggedIn(true);
+            setUsername(savedUsername);
+        }
+    }, []); // <- Fixed: Empty dependency array
+
+    const handleLoginSuccess = (loggedInUsername: string) => {
+        localStorage.setItem('isAuthenticated', 'true');
+        localStorage.setItem('username', loggedInUsername);
+        setUsername(loggedInUsername);
+        setIsLoggedIn(true);
+    };
+
+    const handleLogout = () => {
+        localStorage.removeItem('isAuthenticated');
+        localStorage.removeItem('username');
+        setIsLoggedIn(false);
+        setUsername('');
+    };
+
+    return (
+        <div className="app">
+            {isLoggedIn ? (
+                <Dashboard 
+                    username={username} 
+                    onLogout={handleLogout} 
+                />
+            ) : (
+                <LoginForm 
+                    onLoginSuccess={handleLoginSuccess} 
+                />
+            )}
+        </div>
+    );
+};
+
+export default App;
