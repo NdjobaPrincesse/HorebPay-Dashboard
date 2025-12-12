@@ -1,49 +1,47 @@
-import React, { useState, useEffect } from 'react';
-import LoginForm from './assets/components/Login.tsx';
-import Dashboard from './assets/components/Dashboard.tsx';
+import { BrowserRouter, Routes, Route, Navigate, Outlet } from 'react-router-dom';
+import { isAuthenticated } from './api/auth';
 
-const App: React.FC = () => {
-    const [isLoggedIn, setIsLoggedIn] = useState(false);
-    const [username, setUsername] = useState('');
+// Layout
+import Layout from './components/Layout';
 
-    useEffect(() => {
-        const savedAuth = localStorage.getItem('isAuthenticated');
-        const savedUsername = localStorage.getItem('username');
+// Pages
+import LoginPage from './pages/LoginPage';
+import DashboardPage from './pages/Dashboard';       
+import ClientsPage from './pages/ClientsPage';           
+import TransactionsPage from './pages/TransactionsPage'; 
 
-        if (savedAuth === 'true' && savedUsername) {
-            setIsLoggedIn(true);
-            setUsername(savedUsername);
-        }
-    }, []); // <- Fixed: Empty dependency array
+const App = () => {
+  return (
+    <BrowserRouter>
+      <Routes>
+        <Route 
+          path="/login" 
+          element={isAuthenticated() ? <Navigate to="/dashboard" replace /> : <LoginPage />} 
+        />
 
-    const handleLoginSuccess = (loggedInUsername: string) => {
-        localStorage.setItem('isAuthenticated', 'true');
-        localStorage.setItem('username', loggedInUsername);
-        setUsername(loggedInUsername);
-        setIsLoggedIn(true);
-    };
+        <Route element={<PrivateLayout />}>
+          <Route path="/" element={<Navigate to="/dashboard" replace />} />
+          
+          {/* 1. OVERVIEW */}
+          <Route path="/dashboard" element={<DashboardPage />} />
+          
+          {/* 2. CLIENTS MANAGEMENT */}
+          <Route path="/clients" element={<ClientsPage />} />
+          
+          {/* 3. FINANCIAL HISTORY */}
+          <Route path="/transactions" element={<TransactionsPage />} />
+        </Route>
 
-    const handleLogout = () => {
-        localStorage.removeItem('isAuthenticated');
-        localStorage.removeItem('username');
-        setIsLoggedIn(false);
-        setUsername('');
-    };
+        <Route path="*" element={<Navigate to="/dashboard" />} />
+      </Routes>
+    </BrowserRouter>
+  );
+};
 
-    return (
-        <div className="app">
-            {isLoggedIn ? (
-                <Dashboard 
-                    username={username} 
-                    onLogout={handleLogout} 
-                />
-            ) : (
-                <LoginForm 
-                    onLoginSuccess={handleLoginSuccess} 
-                />
-            )}
-        </div>
-    );
+const PrivateLayout = () => {
+  const isAuth = isAuthenticated();
+  if (!isAuth) return <Navigate to="/login" replace />;
+  return <Layout><Outlet /></Layout>;
 };
 
 export default App;

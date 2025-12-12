@@ -1,73 +1,67 @@
-# React + TypeScript + Vite
+HorebPay Admin Dashboard
+Welcome to the HorebPay Financial Dashboard.
+This project is built with React, TypeScript, Vite, and Tailwind CSS.
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+⚠️ ATTENTION Princesse :
+Before writing a single line of code, read this document carefully.
+We follow a strict Modular Architecture. Do not put logic in UI components. Do not put UI in Page files.
+Understand the Data Flow before making changes.
 
-Currently, two official plugins are available:
+src
+├── api                 <-- 🧠 THE BRAIN (All external communication)
+│   ├── auth.ts         <-- Login/Logout logic & Token management
+│   └── axios.ts        <-- HTTP Client (Handles Proxy & Headers automatically)
+│
+├── components          <-- 🎨 THE UI (Dumb Components)
+│   ├── dashboard       <-- Widgets specific to Dashboard Views
+│   │   ├── ClientTable.tsx      <-- Pure UI for the client list
+│   │   └── TransactionList.tsx  <-- Pure UI for transaction history
+│   ├── layout          <-- Sidebar & Navigation elements
+│   ├── ui              <-- Reusable atoms (Buttons, Inputs)
+│   ├── Layout.tsx      <-- The "Shell" (Sidebar + Main Content Wrapper)
+│   └── StatCard.tsx    <-- Metric Cards (supports Privacy Mode)
+│
+├── pages               <-- ⚙️ THE LOGIC (State & Data Fetching)
+│   ├── ClientsPage.tsx      <-- Management Logic
+│   ├── DashboardPage.tsx    <-- Overview Logic
+│   ├── LoginPage.tsx        <-- Auth Logic
+│   └── TransactionsPage.tsx <-- Financial Logic
+│
+├── types               <-- 🛡️ TYPESCRIPT DEFINITIONS
+│   └── index.ts        <-- Central interfaces (ClientRow, Transaction)
+│
+├── App.tsx             <-- 🚦 ROUTING & AUTH GUARDS
+└── main.tsx            <-- 🚪 ENTRY POINT
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
 
-## React Compiler
+   How the App Works (Data Flow)
+1. The Entry Point
+src/main.tsx: This is where React mounts to the DOM.
+src/App.tsx: This is the Router. It handles:
+Public Routes: /login
+Protected Routes: /dashboard, /clients, etc.
+Guards: It checks isAuthenticated() before letting users see the dashboard.
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+2. The Logic Layer (src/pages/)
+ALL data fetching (fetch), state management (useState), and calculations (reduce/filter) happen inside Pages.
 
-## Expanding the ESLint configuration
+Example: TransactionsPage.tsx fetches the data, calculates the "Total Revenue", and passes the clean numbers down to the UI components.
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+3. The UI Layer (src/components/)
+Components are "dumb". They receive data via props and render it.
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+Rule: Never write a fetch call inside a component in src/components/.
+Rule: Components should not know about API URLs.
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
+4. The API Layer (src/api/)
+We use a Vite Proxy to avoid CORS errors when talking to the Production API.
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
+axios.ts: Automatically attaches the Auth Token to requests.
+auth.ts: Handles Login and Logout (clearing LocalStorage).
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+5. install dependencies : npm i
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+6. npm run dev
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
+Hope it helps 
+Happy Coding!
