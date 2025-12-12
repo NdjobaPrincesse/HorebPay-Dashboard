@@ -67,7 +67,7 @@ export default function TransactionsPage() {
                 onClick={() => setHideValues(!hideValues)}
                 className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium border transition-all shadow-sm
                 ${hideValues 
-                    ? 'bg-amber-50 border-amber-200 text-amber-700 hover:bg-amber-100' 
+                    ? 'bg-amber-50 border-[#FFC107] text-black hover:bg-[#FFC107]' 
                     : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50'
                 }`}
             >
