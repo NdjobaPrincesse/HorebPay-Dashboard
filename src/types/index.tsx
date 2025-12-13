@@ -1,29 +1,32 @@
 // src/types/index.ts
 
-// 1. Transaction Interface
 export interface Transaction {
   id: string;
   amount: number;
   date: string;
-  type: string;  
-  status: string; 
-  clientName?: string; 
+  type: string;
+  status: string;
+  clientName: string;
+  
+  // NEW DETAILED FIELDS
+  txRef: string;        // transactionsId
+  payerPhone: string;   // numeroPayeur
+  receiverPhone: string; // numeroRecepteur
+  method: string;       // methodePaiementNom (ORANGE_MONEY)
+  operator: string;     // operateurNom (CAMEROON_MTN)
+  errorMessage?: string | null;
 }
 
-// 2. Client Interface (for the Table)
 export interface ClientRow {
+  // ... (Keep existing client fields)
   id: string;
-  
-  // Display fields (Masked)
   displayClient: string;
   displayPhone: string;
   displayEmail: string;
-  
-  // Logic fields (Raw data)
   _rawClient: string;
   _rawPhone: string;
   _rawEmail: string;
-  
-  status: string;
+  date: string;
   balance: number;
+  status: string;
 }

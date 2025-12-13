@@ -10,10 +10,10 @@ const menuItems = [
 
 export function Sidebar() {
   return (
-    <aside className="w-64 bg-[#0F172A] text-white h-screen fixed left-0 top-0 flex flex-col border-r border-slate-800 shadow-2xl z-50">
+    <aside className="w-64 bg-[#1e3a8a] text-white h-screen fixed left-0 top-0 flex flex-col border-r border-slate-800 shadow-2xl z-50">
       
       {/* 1. BRAND LOGO */}
-      <div className="h-20 flex items-center px-8 border-b border-slate-800/50 bg-[#0F172A]">
+      <div className="h-20 flex items-center px-8 border-b border-slate-800/50 bg-[#1e3a8a]">
         <h1 className="text-2xl font-bold tracking-tight text-white">
           Horeb<span className="text-[#FFC107]">Pay</span>
         </h1>
@@ -29,7 +29,7 @@ export function Sidebar() {
               flex items-center gap-3 px-4 py-3.5 rounded-xl transition-all group font-medium text-sm tracking-wide
               ${isActive 
                 ? 'bg-[#FFC107] text-black shadow-lg shadow-amber-500/20' 
-                : 'text-slate-400 hover:bg-slate-800 hover:text-white'
+                : 'text-slate-400 hover:bg-[#1e3a8a] hover:text-white'
               }
             `}
           >
@@ -40,10 +40,10 @@ export function Sidebar() {
       </nav>
 
       {/* 3. USER PROFILE & LOGOUT */}
-      <div className="p-4 border-t border-slate-800 bg-[#0F172A]">
-        <div className="flex items-center gap-3 px-4 py-3 mb-2 rounded-xl bg-slate-800/50 border border-slate-700">
+      <div className="p-4 border-t border-slate-800 bg-[#1e3a8a]">
+        <div className="flex items-center gap-3 px-4 py-3 mb-2 rounded-xl  border-[#FFC107]">
            <div className="h-8 w-8 rounded-full bg-[#FFC107] flex items-center justify-center text-black font-bold text-xs">
-             AD
+             
            </div>
            <div className="overflow-hidden">
              <p className="text-sm font-bold text-white truncate">Borel</p>
