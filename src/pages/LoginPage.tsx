@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Mail, Lock, Loader2, ArrowRight } from 'lucide-react';
-import { login } from '../api/auth'; 
+// import { login } from '../api/auth'; // API login commented out for this specific hardcoded check
 
 const LoginPage = () => {
   const [username, setUsername] = useState('');
@@ -13,12 +13,32 @@ const LoginPage = () => {
     setIsLoading(true);
     setError('');
 
+    // Simulate network delay for better UX
+    await new Promise((resolve) => setTimeout(resolve, 800));
+
     try {
-      await login(username, password);
-      window.location.href = '/';
+      // --- STRICT CREDENTIAL CHECK ---
+      // We check exactly for 'Admin' and '1234'
+      if (username === 'Admin' && password === '1234') {
+        
+        // 1. Set a flag in localStorage so the Router knows the user is logged in
+        // (You might need to adjust this key based on how your App.tsx handles protection)
+        localStorage.setItem('isAuthenticated', 'true'); 
+        localStorage.setItem('user', JSON.stringify({ name: 'Admin', role: 'admin' }));
+
+        // 2. Redirect to Dashboard
+        window.location.href = '/'; 
+      } else {
+        throw new Error('Invalid credentials');
+      }
+
+      // If you were using the real API, it would look like this:
+      // await login(username, password);
+      // window.location.href = '/';
+
     } catch (err) {
       console.error(err);
-      setError('Invalid credentials. Please check your details.');
+      setError('Invalid credentials. Please check your username and password.');
       setIsLoading(false);
     }
   };
@@ -40,7 +60,7 @@ const LoginPage = () => {
 
         <form onSubmit={handleSubmit} className="space-y-6">
           <div>
-            <label className="mb-2 block text-sm font-medium text-gray-700">Username / Email</label>
+            <label className="mb-2 block text-sm font-medium text-gray-700">Username</label>
             <div className="relative">
               <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-gray-400">
                 <Mail className="h-5 w-5" />
@@ -112,32 +132,18 @@ const LoginPage = () => {
       </div>
 
       {/* RIGHT SIDE: BRANDING/MARKETING */}
-      {/* Changed bg-blue-900 to blue-950 for deeper contrast with yellow */}
       <div className="hidden w-1/2 flex-col justify-between bg-blue-950 p-12 lg:flex relative overflow-hidden">
         
-        {/* --- YELLOW SHAPES START --- */}
-        
-        {/* 1. The Large Glow (Top Right) - Soft light source */}
+        {/* --- YELLOW SHAPES --- */}
         <div className="absolute top-[-10%] right-[-10%] h-[600px] w-[600px] rounded-full bg-[#FFC107]/20 blur-[120px]" />
-        
-        {/* 2. The Geometric Ring (Top Right) - Adds Tech/Structure feel */}
         <div className="absolute top-[10%] right-[-5%] h-[300px] w-[300px] rounded-full border-[2px] border-[#FFC107]/20" />
-        
-        {/* 3. The Solid Accent (Center Right) - Visual anchor */}
         <div className="absolute top-[30%] right-[10%] h-12 w-12 rounded-full bg-[#FFC107]/80 blur-md" />
-        
-        {/* 4. The Bottom Glow (Bottom Left) - Balance */}
         <div className="absolute bottom-[-10%] left-[-10%] h-[400px] w-[400px] rounded-full bg-[#FFC107]/10 blur-[100px]" />
-        
-        {/* 5. Pattern Grid (Subtle texture overlay) */}
         <div className="absolute inset-0 opacity-[0.03]" 
              style={{ backgroundImage: 'radial-gradient(#FFC107 1px, transparent 1px)', backgroundSize: '32px 32px' }}>
         </div>
 
-        {/* --- YELLOW SHAPES END --- */}
-
-        <div className="relative z-10">
-        </div>
+        <div className="relative z-10"></div>
 
         <div className="relative z-10 max-w-md">
           <h2 className="text-4xl font-bold leading-tight text-white mb-6">
@@ -147,8 +153,6 @@ const LoginPage = () => {
             "HorebPay gives us the visibility and control we need to manage thousands of daily transactions with zero friction."
           </p>
           <div className="mt-8 flex items-center gap-4">
-             {/* Changed Avatar to Yellow */}
-             
              <div>
                 <p className="text-white font-semibold">Borel T.</p>
                 <p className="text-blue-300 text-sm">Lead Developer</p>
