@@ -2,9 +2,10 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { 
   Users, Banknote, Download, Filter, Search, RefreshCw, 
   Eye, EyeOff, ChevronDown, CheckCircle2, XCircle, AlertCircle, 
-  ArrowRight, Wallet, Database, Printer, Calendar
+  ArrowRight, Wallet, Database, Printer, Calendar, LogOut // Import LogOut Icon
 } from 'lucide-react';
 import api from '../api/axios'; 
+import { logout } from '../api/auth'; // Import logout function
 import TransactionReceipt from '../components/TransactionReceipt';
 
 // --- TYPES ---
@@ -87,7 +88,6 @@ export default function Dashboard() {
 
       // PROCESS TRANSACTIONS
       if (txRes.status === 'fulfilled') {
-        // Handle: Array vs Spring Boot Page Object ({ content: [...] })
         const rawData = txRes.value.data;
         const txData = Array.isArray(rawData) ? rawData : (rawData.content || []);
         
@@ -106,8 +106,6 @@ export default function Dashboard() {
           txStatus: normalizeStatus(t.statusTransaction || t.status)
         }));
         setTransactions(formattedTx.sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime()));
-      } else {
-        console.error("Tx Fetch Failed", txRes.reason);
       }
 
       // PROCESS CLIENTS
@@ -125,8 +123,6 @@ export default function Dashboard() {
           date: c.createdAt || c.date || new Date().toISOString()
         }));
         setClients(formattedClients);
-      } else {
-        console.error("Client Fetch Failed", clientsRes.reason);
       }
 
     } catch (e) {
@@ -143,7 +139,7 @@ export default function Dashboard() {
     const searchTerms = cleanStr(filters.searchQuery);
 
     if (activeTab === 'TRANSACTIONS') {
-        // --- TRANSACTION FILTERS ---
+        // ... (Keep existing transaction filter logic) ...
         const searchPayer = cleanStr(filters.payer);
         const searchReceiver = cleanStr(filters.receiver);
         const minAmt = filters.minAmount ? parseFloat(filters.minAmount) : null;
@@ -160,7 +156,6 @@ export default function Dashboard() {
         }
 
         return transactions.filter(item => {
-            // Text Search
             if (searchTerms) {
                 const match = 
                     cleanStr(item.clientName).includes(searchTerms) ||
@@ -168,13 +163,11 @@ export default function Dashboard() {
                     cleanStr(item.product).includes(searchTerms);
                 if (!match) return false;
             }
-            // Advanced Fields
             if (searchPayer && !cleanStr(item.payerPhone).includes(searchPayer)) return false;
             if (searchReceiver && !cleanStr(item.receiverPhone).includes(searchReceiver)) return false;
             if (minAmt !== null && item.amount < minAmt) return false;
             if (maxAmt !== null && item.amount > maxAmt) return false;
             if (filters.status !== 'ALL' && item.txStatus !== filters.status) return false;
-            // Date
             if (filters.date) {
                 const tDate = new Date(item.date).getTime();
                 if (tDate < filterStart || tDate > filterEnd) return false;
@@ -183,7 +176,7 @@ export default function Dashboard() {
         });
 
     } else {
-        // --- CLIENT FILTERS ---
+        // ... (Keep existing client filter logic) ...
         return clients.filter(c => {
             if (searchTerms) {
                 return cleanStr(c.name).includes(searchTerms) || cleanStr(c.phone).includes(searchTerms);
@@ -231,6 +224,13 @@ export default function Dashboard() {
     date: '', searchQuery: '', payer: '', receiver: '', minAmount: '', maxAmount: '', status: 'ALL'
   });
 
+  // --- LOGOUT HANDLER ---
+  const handleLogout = () => {
+    if (confirm("Are you sure you want to log out?")) {
+        logout(); // Calls the auth logic to clear token and redirect
+    }
+  };
+
   return (
     <div className="min-h-screen w-full font-sans text-slate-800 pb-20 p-4 md:p-6 lg:p-8">
       
@@ -270,6 +270,15 @@ export default function Dashboard() {
                 </button>
                 <button onClick={exportCSV} className="flex items-center gap-2 px-4 py-2 bg-[#1e3a8a] text-white rounded-xl hover:bg-[#1e3a8a]/90 text-sm font-bold">
                     <Download className="h-4 w-4"/>
+                </button>
+                
+                {/* LOGOUT BUTTON */}
+                <button 
+                    onClick={handleLogout} 
+                    className="px-3 py-2 bg-red-50 border border-red-100 rounded-xl text-red-600 hover:bg-red-100 transition-colors ml-2"
+                    title="Log Out"
+                >
+                    <LogOut className="h-4 w-4"/>
                 </button>
            </div>
         </div>
