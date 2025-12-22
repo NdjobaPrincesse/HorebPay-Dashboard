@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
 import { Mail, Lock, Loader2, ArrowRight } from 'lucide-react';
-import { login } from '../api/auth'; // Importing the real auth function
+import { login } from '../api/auth'; 
 
 const LoginPage = () => {
-  const [username, setUsername] = useState('');
+  const [email, setEmail] = useState(''); // Changed from username
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
@@ -14,34 +14,18 @@ const LoginPage = () => {
     setError('');
 
     try {
-      // 1. Call the Real API
-      // This goes to src/api/auth.ts -> src/api/axios.ts -> Proxy -> Prod Server
-      await login(username, password);
-      
-      // 2. Redirect on Success
-      // The login function already saved the token to localStorage
+      // Pass email and password (which will be mapped to motDePasse in api/auth.ts)
+      await login(email, password);
       window.location.href = '/';
-
     } catch (err: any) {
-      console.error("Login Error:", err);
-      
-      // 3. Handle Specific Errors
-      if (err.response) {
-        // Backend responded with an error code
-        if (err.response.status === 401 || err.response.status === 403) {
-          setError('Invalid credentials. Please check your username and password.');
-        } else if (err.response.status === 404) {
-          setError('Login service not found. Please contact support.');
-        } else {
-          setError(`Server Error (${err.response.status}). Please try again.`);
-        }
-      } else if (err.request) {
-        // Request was made but no response received (Network Error)
-        setError('Network error. Unable to connect to the server.');
+      console.error("Login Failed:", err);
+      if (err.response && err.response.status === 404) {
+          setError("Server endpoint not found. Check proxy.");
+      } else if (err.response && err.response.status === 401) {
+          setError("Invalid email or password.");
       } else {
-        setError('An unexpected error occurred.');
+          setError("Login failed. Check your connection.");
       }
-      
       setIsLoading(false);
     }
   };
@@ -58,24 +42,24 @@ const LoginPage = () => {
             </span>
           </div>
           <h2 className="text-3xl font-bold tracking-tight text-gray-900">Welcome back</h2>
-          <p className="mt-2 text-sm text-gray-500">Please enter your details to sign in to the dashboard.</p>
+          <p className="mt-2 text-sm text-gray-500">Sign in to manage your financial operations.</p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-6">
           <div>
-            <label className="mb-2 block text-sm font-medium text-gray-700">Username</label>
+            <label className="mb-2 block text-sm font-medium text-gray-700">Email Address</label>
             <div className="relative">
               <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-gray-400">
                 <Mail className="h-5 w-5" />
               </div>
               <input
-                type="text"
+                type="email" // Changed to email type
                 required
                 className="block w-full rounded-lg border border-gray-300 bg-white p-3 pl-10 text-gray-900 outline-none transition-all 
                 focus:border-[#FFC107] focus:ring-2 focus:ring-[#FFC107]/20"
-                placeholder="Enter your username"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
+                placeholder="leroi22@gmail.com" // Updated placeholder
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
               />
             </div>
           </div>
@@ -134,8 +118,8 @@ const LoginPage = () => {
         </p>
       </div>
 
-      {/* RIGHT SIDE: BRANDING/MARKETING */}
-      <div className="hidden w-1/2 flex-col justify-between bg-blue-950 p-12 lg:flex relative overflow-hidden">
+      {/* RIGHT SIDE (Keep your existing design) */}
+            <div className="hidden w-1/2 flex-col justify-between bg-blue-950 p-12 lg:flex relative overflow-hidden">
         
         {/* --- YELLOW SHAPES --- */}
         <div className="absolute top-[-10%] right-[-10%] h-[600px] w-[600px] rounded-full bg-[#FFC107]/20 blur-[120px]" />

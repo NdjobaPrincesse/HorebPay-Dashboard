@@ -1,17 +1,21 @@
 import api from './axios';
 
-export const login = async (username: string, password: string) => {
-  // Localhost: Hits http://localhost:5173/api/auth/login -> Proxy -> Prod
+// Update function signature to be clear
+export const login = async (email: string, motDePasse: string) => {
+  
+  // POST to /api/auth/login (which proxies to /horeb/api/auth/login)
   const response = await api.post('/auth/login', {
-    username,
-    password,
+    // USE THE FRENCH KEYS REQUIRED BY BACKEND
+    email: email,       
+    motDePasse: motDePasse 
   });
 
   const { token, user } = response.data;
 
   if (token) {
     localStorage.setItem('token', token);
-    localStorage.setItem('user', JSON.stringify(user || { username }));
+    // Create a user object if backend doesn't send one
+    localStorage.setItem('user', JSON.stringify(user || { email: email }));
   }
 
   return response.data;
@@ -23,8 +27,6 @@ export const logout = () => {
     window.location.href = '/login';
 };
 
-// --- ADD THIS FUNCTION ---
 export const isAuthenticated = () => {
-    const token = localStorage.getItem('token');
-    return !!token; // Returns true if token exists
+    return !!localStorage.getItem('token');
 };
