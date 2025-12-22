@@ -1,7 +1,5 @@
 import axios from 'axios';
 
-// FORCE relative path. 
-// Vercel will see this and use vercel.json to redirect it.
 const baseURL = '/api';
 
 const api = axios.create({
