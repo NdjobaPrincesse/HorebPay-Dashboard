@@ -1,27 +1,30 @@
-// src/api/auth.ts
+import api from './axios';
 
-// 1. LOGIN FUNCTION
-export const login = async (email: string, password: string) => {
-    return new Promise((resolve, reject) => {
-        setTimeout(() => {
-            if (email.length > 0 && password.length > 0) {
-                const mockToken = "fake-jwt-token-123456";
-                localStorage.setItem('token', mockToken);
-                resolve({ token: mockToken });
-            } else {
-                reject(new Error("Invalid credentials"));
-            }
-        }, 1000);
-    });
+export const login = async (username: string, password: string) => {
+  // Localhost: Hits http://localhost:5173/api/auth/login -> Proxy -> Prod
+  const response = await api.post('/auth/login', {
+    username,
+    password,
+  });
+
+  const { token, user } = response.data;
+
+  if (token) {
+    localStorage.setItem('token', token);
+    localStorage.setItem('user', JSON.stringify(user || { username }));
+  }
+
+  return response.data;
 };
 
-// 2. LOGOUT FUNCTION
 export const logout = () => {
     localStorage.removeItem('token');
+    localStorage.removeItem('user');
     window.location.href = '/login';
 };
 
-// 3. AUTH CHECK FUNCTION
+// --- ADD THIS FUNCTION ---
 export const isAuthenticated = () => {
-    return !!localStorage.getItem('token');
+    const token = localStorage.getItem('token');
+    return !!token; // Returns true if token exists
 };

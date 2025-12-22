@@ -30,3 +30,59 @@
     overflow: hidden; 
   }
 }
+
+/* src/index.css */
+
+@media print {
+  /* HIDE EVERYTHING by default */
+  .no-print, 
+  button, 
+  input, 
+  select, 
+  .kpi-cards, 
+  .tabs-container {
+    display: none !important;
+  }
+
+  /* SHOW only specific areas */
+  body, #root, .print-area {
+    visibility: visible;
+    background-color: white !important;
+    height: auto;
+    width: 100%;
+    position: absolute;
+    top: 0;
+    left: 0;
+    margin: 0;
+    padding: 0;
+  }
+
+  /* Table Adjustments for Print */
+  table {
+    width: 100% !important;
+    border-collapse: collapse;
+    font-size: 12px;
+  }
+  
+  th, td {
+    border: 1px solid #ddd !important;
+    padding: 8px !important;
+    color: black !important;
+  }
+
+  /* Hide scrollbars */
+  .overflow-x-auto {
+    overflow: visible !important;
+  }
+
+  /* Force Background Colors (for Status Badges) */
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+}
+
+/* Modal Specific Print Styles */
+.receipt-modal-content {
+  background: white;
+}

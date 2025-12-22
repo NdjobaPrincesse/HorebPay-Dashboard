@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Mail, Lock, Loader2, ArrowRight } from 'lucide-react';
-// import { login } from '../api/auth'; // API login commented out for this specific hardcoded check
+import { login } from '../api/auth'; // Importing the real auth function
 
 const LoginPage = () => {
   const [username, setUsername] = useState('');
@@ -13,32 +13,35 @@ const LoginPage = () => {
     setIsLoading(true);
     setError('');
 
-    // Simulate network delay for better UX
-    await new Promise((resolve) => setTimeout(resolve, 800));
-
     try {
-      // --- STRICT CREDENTIAL CHECK ---
-      // We check exactly for 'Admin' and '1234'
-      if (username === 'Admin' && password === '1234') {
-        
-        // 1. Set a flag in localStorage so the Router knows the user is logged in
-        // (You might need to adjust this key based on how your App.tsx handles protection)
-        localStorage.setItem('isAuthenticated', 'true'); 
-        localStorage.setItem('user', JSON.stringify({ name: 'Admin', role: 'admin' }));
+      // 1. Call the Real API
+      // This goes to src/api/auth.ts -> src/api/axios.ts -> Proxy -> Prod Server
+      await login(username, password);
+      
+      // 2. Redirect on Success
+      // The login function already saved the token to localStorage
+      window.location.href = '/';
 
-        // 2. Redirect to Dashboard
-        window.location.href = '/'; 
+    } catch (err: any) {
+      console.error("Login Error:", err);
+      
+      // 3. Handle Specific Errors
+      if (err.response) {
+        // Backend responded with an error code
+        if (err.response.status === 401 || err.response.status === 403) {
+          setError('Invalid credentials. Please check your username and password.');
+        } else if (err.response.status === 404) {
+          setError('Login service not found. Please contact support.');
+        } else {
+          setError(`Server Error (${err.response.status}). Please try again.`);
+        }
+      } else if (err.request) {
+        // Request was made but no response received (Network Error)
+        setError('Network error. Unable to connect to the server.');
       } else {
-        throw new Error('Invalid credentials');
+        setError('An unexpected error occurred.');
       }
-
-      // If you were using the real API, it would look like this:
-      // await login(username, password);
-      // window.location.href = '/';
-
-    } catch (err) {
-      console.error(err);
-      setError('Invalid credentials. Please check your username and password.');
+      
       setIsLoading(false);
     }
   };

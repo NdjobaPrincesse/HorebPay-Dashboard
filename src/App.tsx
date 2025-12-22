@@ -1,47 +1,45 @@
+import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate, Outlet } from 'react-router-dom';
 import { isAuthenticated } from './api/auth';
 
-// Layout
-import Layout from './components/Layout';
-
 // Pages
 import LoginPage from './pages/LoginPage';
-import DashboardPage from './pages/Dashboard';       
-import ClientsPage from './pages/ClientsPage';           
-import TransactionsPage from './pages/TransactionsPage'; 
+import Dashboard from './pages/Dashboard';       
 
 const App = () => {
   return (
     <BrowserRouter>
       <Routes>
+        {/* 1. LOGIN ROUTE */}
+        {/* If user is already logged in, redirect them to Dashboard immediately */}
         <Route 
           path="/login" 
-          element={isAuthenticated() ? <Navigate to="/dashboard" replace /> : <LoginPage />} 
+          element={isAuthenticated() ? <Navigate to="/" replace /> : <LoginPage />} 
         />
 
-        <Route element={<PrivateLayout />}>
-          <Route path="/" element={<Navigate to="/dashboard" replace />} />
-          
-          {/* 1. OVERVIEW */}
-          <Route path="/dashboard" element={<DashboardPage />} />
-          
-          {/* 2. CLIENTS MANAGEMENT */}
-          <Route path="/clients" element={<ClientsPage />} />
-          
-          {/* 3. FINANCIAL HISTORY */}
-          <Route path="/transactions" element={<TransactionsPage />} />
+        {/* 2. PROTECTED ROUTES (Private) */}
+        <Route element={<PrivateRoutes />}>
+          {/* The Dashboard now contains both Transactions and Clients via Tabs */}
+          <Route path="/" element={<Dashboard />} />
         </Route>
 
-        <Route path="*" element={<Navigate to="/dashboard" />} />
+        {/* 3. FALLBACK - Redirect any unknown URL to Dashboard */}
+        <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </BrowserRouter>
   );
 };
 
-const PrivateLayout = () => {
+// Security Wrapper
+const PrivateRoutes = () => {
   const isAuth = isAuthenticated();
+  
+  // If not logged in, kick to login page
   if (!isAuth) return <Navigate to="/login" replace />;
-  return <Layout><Outlet /></Layout>;
+  
+  // If logged in, render the child route (Dashboard)
+  // We removed <Layout> here so there is NO SIDEBAR, just your new full-width Dashboard.
+  return <Outlet />;
 };
 
 export default App;
