@@ -1,11 +1,9 @@
 import api from './axios';
 
-// Update function signature to be clear
 export const login = async (email: string, motDePasse: string) => {
   
-  // POST to /api/auth/login (which proxies to /horeb/api/auth/login)
-  const response = await api.post('/auth/login', {
-    // USE THE FRENCH KEYS REQUIRED BY BACKEND
+  // 1. CHANGE THIS URL to '/users/login'
+  const response = await api.post('/users/login', {
     email: email,       
     motDePasse: motDePasse 
   });
@@ -14,8 +12,7 @@ export const login = async (email: string, motDePasse: string) => {
 
   if (token) {
     localStorage.setItem('token', token);
-    // Create a user object if backend doesn't send one
-    localStorage.setItem('user', JSON.stringify(user || { email: email }));
+    localStorage.setItem('user', JSON.stringify(user || { email }));
   }
 
   return response.data;
