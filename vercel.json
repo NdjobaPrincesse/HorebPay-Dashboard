@@ -1,8 +1,8 @@
 {
   "rewrites": [
     {
-      "source": "/api/:path*",
-      "destination": "https://prod.horebpay.com/horeb/api/:path*"
+      "source": "/api/(.*)",
+      "destination": "https://prod.horebpay.com/horeb/api/$1"
     },
     {
       "source": "/(.*)",
