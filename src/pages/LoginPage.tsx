@@ -3,7 +3,7 @@ import { Mail, Lock, Loader2, ArrowRight } from 'lucide-react';
 import { login } from '../api/auth'; 
 
 const LoginPage = () => {
-  const [email, setEmail] = useState(''); // Changed from username
+  const [username, setUsername] = useState(''); // Back to username
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
@@ -14,17 +14,17 @@ const LoginPage = () => {
     setError('');
 
     try {
-      // Pass email and password (which will be mapped to motDePasse in api/auth.ts)
-      await login(email, password);
+      // Pass username and password
+      await login(username, password);
       window.location.href = '/';
     } catch (err: any) {
       console.error("Login Failed:", err);
-      if (err.response && err.response.status === 404) {
-          setError("Server endpoint not found. Check proxy.");
-      } else if (err.response && err.response.status === 401) {
-          setError("Invalid email or password.");
+      if (err.response && err.response.status === 401) {
+          setError("Invalid username or password.");
+      } else if (err.response && err.response.status === 404) {
+          setError("Server endpoint not found. Check Vercel config.");
       } else {
-          setError("Login failed. Check your connection.");
+          setError("Login failed. Please check your connection.");
       }
       setIsLoading(false);
     }
@@ -47,19 +47,19 @@ const LoginPage = () => {
 
         <form onSubmit={handleSubmit} className="space-y-6">
           <div>
-            <label className="mb-2 block text-sm font-medium text-gray-700">Email Address</label>
+            <label className="mb-2 block text-sm font-medium text-gray-700">Username</label>
             <div className="relative">
               <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-gray-400">
                 <Mail className="h-5 w-5" />
               </div>
               <input
-                type="email" // Changed to email type
+                type="text"
                 required
                 className="block w-full rounded-lg border border-gray-300 bg-white p-3 pl-10 text-gray-900 outline-none transition-all 
                 focus:border-[#FFC107] focus:ring-2 focus:ring-[#FFC107]/20"
-                placeholder="leroi22@gmail.com" // Updated placeholder
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                placeholder="Enter your username"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
               />
             </div>
           </div>
@@ -118,37 +118,13 @@ const LoginPage = () => {
         </p>
       </div>
 
-      {/* RIGHT SIDE (Keep your existing design) */}
-            <div className="hidden w-1/2 flex-col justify-between bg-blue-950 p-12 lg:flex relative overflow-hidden">
-        
-        {/* --- YELLOW SHAPES --- */}
+      {/* RIGHT SIDE */}
+      <div className="hidden w-1/2 flex-col justify-between bg-blue-950 p-12 lg:flex relative overflow-hidden">
         <div className="absolute top-[-10%] right-[-10%] h-[600px] w-[600px] rounded-full bg-[#FFC107]/20 blur-[120px]" />
-        <div className="absolute top-[10%] right-[-5%] h-[300px] w-[300px] rounded-full border-[2px] border-[#FFC107]/20" />
-        <div className="absolute top-[30%] right-[10%] h-12 w-12 rounded-full bg-[#FFC107]/80 blur-md" />
-        <div className="absolute bottom-[-10%] left-[-10%] h-[400px] w-[400px] rounded-full bg-[#FFC107]/10 blur-[100px]" />
-        <div className="absolute inset-0 opacity-[0.03]" 
-             style={{ backgroundImage: 'radial-gradient(#FFC107 1px, transparent 1px)', backgroundSize: '32px 32px' }}>
-        </div>
-
-        <div className="relative z-10"></div>
-
-        <div className="relative z-10 max-w-md">
+        <div className="relative z-10 max-w-md mt-auto mb-auto">
           <h2 className="text-4xl font-bold leading-tight text-white mb-6">
             The modern standard for financial operations.
           </h2>
-          <p className="text-lg text-blue-200 leading-relaxed">
-            "HorebPay gives us the visibility and control we need to manage thousands of daily transactions with zero friction."
-          </p>
-          <div className="mt-8 flex items-center gap-4">
-             <div>
-                <p className="text-white font-semibold">Borel T.</p>
-                <p className="text-blue-300 text-sm">Lead Developer</p>
-             </div>
-          </div>
-        </div>
-        
-        <div className="relative z-10 text-xs text-blue-400">
-           © {new Date().getFullYear()} HorebPay Inc. All rights reserved.
         </div>
       </div>
     </div>

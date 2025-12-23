@@ -1,6 +1,10 @@
 {
   "rewrites": [
     {
+      "source": "/api/auth/login",
+      "destination": "https://prod.horebpay.com/horeb/users/login"
+    },
+    {
       "source": "/api/:match*",
       "destination": "https://prod.horebpay.com/horeb/api/:match*"
     },
