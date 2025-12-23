@@ -5,14 +5,13 @@ export default defineConfig({
   plugins: [react()],
   server: {
     proxy: {
-      // 1. Special Rule for Login (Matches Vercel)
       '/api/auth/login': {
-        target: 'https://prod.horebpay.com/horeb/users/login',
+        // Pointing to the URL that gave us a response in your curl test
+        target: 'https://prod.horebpay.com/horeb/api/users/login',
         changeOrigin: true,
         secure: false,
-        rewrite: (path) => '', // Removes the path, sends payload to target root
+        rewrite: (path) => '', 
       },
-      // 2. General Rule for Data (Transactions/Clients)
       '/api': {
         target: 'https://prod.horebpay.com/horeb/api',
         changeOrigin: true,

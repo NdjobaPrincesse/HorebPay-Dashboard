@@ -2,7 +2,7 @@
   "rewrites": [
     {
       "source": "/api/auth/login",
-      "destination": "https://prod.horebpay.com/horeb/users/login"
+      "destination": "https://prod.horebpay.com/horeb/api/users/login"
     },
     {
       "source": "/api/:match*",
