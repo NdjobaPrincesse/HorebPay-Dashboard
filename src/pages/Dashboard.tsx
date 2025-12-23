@@ -59,19 +59,23 @@ export default function Dashboard() {
   const [isPrivacyMode, setIsPrivacyMode] = useState(false);
   const [showFilters, setShowFilters] = useState(false); 
   
-  // MODALS STATE
   const [selectedTx, setSelectedTx] = useState<Transaction | null>(null);
   const [isLogoutOpen, setIsLogoutOpen] = useState(false);
 
   const [filters, setFilters] = useState({
-    date: '', searchQuery: '', payer: '', receiver: '', minAmount: '', maxAmount: '', status: 'ALL' 
+    date: '', 
+    searchQuery: '', 
+    payer: '',       
+    receiver: '',    
+    minAmount: '',
+    maxAmount: '',
+    status: 'ALL' 
   });
 
+  // --- DATA FETCHING ---
   const fetchData = async () => {
     setLoading(true);
     try {
-      console.log("Fetching Data..."); 
-
       const [txRes, clientsRes] = await Promise.allSettled([
         api.get("/transactions"),
         api.get("/clients")
@@ -111,7 +115,6 @@ export default function Dashboard() {
           status: c.email ? 'Active' : 'Guest',
           date: c.createdAt || c.date || new Date().toISOString()
         }));
-        // Sort: Newest First
         setClients(formattedClients.sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime()));
       }
 
@@ -124,6 +127,7 @@ export default function Dashboard() {
 
   useEffect(() => { fetchData(); }, []);
 
+  // --- FILTER LOGIC ---
   const filteredData = useMemo(() => {
     const searchTerms = cleanStr(filters.searchQuery);
 
@@ -153,7 +157,8 @@ export default function Dashboard() {
             if (minAmt !== null && item.amount < minAmt) return false;
             if (maxAmt !== null && item.amount > maxAmt) return false;
             if (filters.status !== 'ALL') {
-                if (item.txStatus !== filters.status && item.paymentStatus !== filters.status) return false;
+                const statusMatch = item.txStatus === filters.status || item.paymentStatus === filters.status;
+                if (!statusMatch) return false;
             }
             if (filters.date) {
                 const tDate = new Date(item.date).getTime();
@@ -169,14 +174,29 @@ export default function Dashboard() {
     }
   }, [transactions, clients, filters, activeTab]);
 
+  // --- DYNAMIC STATS ---
   const stats = useMemo(() => {
-    return {
-        revenue: transactions.filter(t => t.txStatus === 'SUCCESS').reduce((sum, t) => sum + t.amount, 0),
-        txCount: transactions.length,
-        clientCount: clients.length
-    };
-  }, [transactions, clients]);
+    if (activeTab === 'TRANSACTIONS') {
+        // When viewing Transactions: Calculate Revenue from the FILTERED list
+        const visibleTxs = filteredData as Transaction[];
+        return {
+            revenue: visibleTxs.filter(t => t.txStatus === 'SUCCESS').reduce((sum, t) => sum + t.amount, 0),
+            txCount: visibleTxs.length,
+            clientCount: clients.length // Show global client count
+        };
+    } else {
+        // When viewing Clients: Show Global Revenue (or filtered if you preferred)
+        // Usually dashboards show Global Revenue here, but let's stick to consistent global stats for Client view
+        const globalRevenue = transactions.filter(t => t.txStatus === 'SUCCESS').reduce((sum, t) => sum + t.amount, 0);
+        return {
+            revenue: globalRevenue,
+            txCount: transactions.length,
+            clientCount: (filteredData as Client[]).length // Show filtered client count
+        };
+    }
+  }, [filteredData, transactions, clients, activeTab]);
 
+  // --- EXPORT ---
   const exportCSV = () => {
     const isTx = activeTab === 'TRANSACTIONS';
     const headers = isTx 
@@ -202,68 +222,50 @@ export default function Dashboard() {
   return (
     <div className="min-h-screen w-full font-sans text-slate-800 pb-20 p-4 md:p-6 lg:p-8">
       
-      {/* HEADER - RESPONSIVE FLEX */}
+      {/* HEADER */}
       <div className="flex flex-col xl:flex-row justify-between items-start xl:items-end gap-6 pb-2 border-b border-gray-200/60 mb-8 no-print">
         <div>
-          <h1 className="text-2xl md:text-3xl font-extrabold text-[#1e3a8a] tracking-tight">Financial Dashboard</h1>
+          <h1 className="text-2xl md:text-3xl font-extrabold text-[#1e3a8a] tracking-tight">HOREB PAY</h1><h1 className = "text-2xl md:text-3xl font-extrabold text-[#FFC107] tracking-tight">Dashboard</h1>
           <p className="text-slate-500 mt-1 font-medium text-sm md:text-base">Real-time overview of HorebPay ecosystem.</p>
         </div>
 
         <div className="flex flex-col sm:flex-row gap-3 w-full xl:w-auto">
-           {/* VIEW TOGGLE */}
            <div className="flex p-1 bg-slate-100 rounded-xl border border-slate-200 w-full sm:w-auto">
-                <button 
-                    onClick={() => setActiveTab('TRANSACTIONS')}
-                    className={`flex-1 sm:flex-none px-4 py-2 text-sm font-bold rounded-lg transition-all ${activeTab === 'TRANSACTIONS' ? 'bg-white shadow text-[#1e3a8a]' : 'text-slate-500 hover:text-slate-700'}`}
-                >
-                    Transactions
-                </button>
-                <button 
-                    onClick={() => setActiveTab('CLIENTS')}
-                    className={`flex-1 sm:flex-none px-4 py-2 text-sm font-bold rounded-lg transition-all ${activeTab === 'CLIENTS' ? 'bg-white shadow text-[#1e3a8a]' : 'text-slate-500 hover:text-slate-700'}`}
-                >
-                    Clients
-                </button>
+                <button onClick={() => setActiveTab('TRANSACTIONS')} className={`flex-1 sm:flex-none px-4 py-2 text-sm font-bold rounded-lg transition-all ${activeTab === 'TRANSACTIONS' ? 'bg-white shadow text-[#1e3a8a]' : 'text-slate-500 hover:text-slate-700'}`}>Transactions</button>
+                <button onClick={() => setActiveTab('CLIENTS')} className={`flex-1 sm:flex-none px-4 py-2 text-sm font-bold rounded-lg transition-all ${activeTab === 'CLIENTS' ? 'bg-white shadow text-[#1e3a8a]' : 'text-slate-500 hover:text-slate-700'}`}>Clients</button>
            </div>
 
-           {/* ACTION BUTTONS GRID ON MOBILE */}
            <div className="grid grid-cols-4 sm:flex sm:gap-2 gap-2">
-                <button onClick={() => window.print()} className="flex items-center justify-center p-2 sm:px-4 sm:py-2 bg-gray-800 text-white rounded-xl hover:bg-gray-900 font-semibold text-sm">
-                    <Printer className="h-4 w-4"/> <span className="hidden sm:inline ml-2">List</span>
-                </button>
-                <button onClick={() => setIsPrivacyMode(!isPrivacyMode)} className={`flex items-center justify-center p-2 sm:px-3 rounded-xl border transition-all ${isPrivacyMode ? 'bg-[#FFC107]/10 border-[#FFC107] text-[#b45309]' : 'bg-white border-slate-200 text-slate-600'}`}>
-                    {isPrivacyMode ? <EyeOff className="h-4 w-4"/> : <Eye className="h-4 w-4"/>}
-                </button>
-                <button onClick={fetchData} className="flex items-center justify-center p-2 sm:px-3 bg-white border rounded-xl text-slate-600">
-                    <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
-                </button>
-                <button onClick={exportCSV} className="flex items-center justify-center p-2 sm:px-4 bg-[#1e3a8a] text-white rounded-xl hover:bg-[#1e3a8a]/90">
-                    <Download className="h-4 w-4"/>
-                </button>
-                
-                {/* LOGOUT */}
-                <button onClick={() => setIsLogoutOpen(true)} className="flex items-center justify-center p-2 sm:px-3 bg-red-50 border border-red-100 rounded-xl text-red-600 hover:bg-red-100 col-span-4 sm:col-span-1 mt-2 sm:mt-0">
-                    <LogOut className="h-4 w-4"/>
-                </button>
+                <button onClick={() => window.print()} className="flex items-center justify-center p-2 sm:px-4 sm:py-2 bg-[#1e3a8a] text-white rounded-xl  font-semibold text-sm"><Printer className="h-4 w-4"/> <span className="hidden sm:inline ml-2">List</span></button>
+                <button onClick={() => setIsPrivacyMode(!isPrivacyMode)} className={`flex items-center justify-center p-2 sm:px-3 rounded-xl border transition-all ${isPrivacyMode ? ' border-[#FFC107] text-[#FFC107]' : 'bg-white border-slate-200 text-slate-600'}`}>{isPrivacyMode ? <EyeOff className="h-4 w-4"/> : <Eye className="h-4 w-4"/>}</button>
+                <button onClick={fetchData} className="flex items-center justify-center p-2 sm:px-3 bg-white border rounded-xl text-slate-600"><RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} /></button>
+                <button onClick={exportCSV} className="flex items-center justify-center p-2 sm:px-4 bg-[#1e3a8a] text-white rounded-xl hover:bg-[#1e3a8a]/90"><Download className="h-4 w-4"/></button>
+                <button onClick={() => setIsLogoutOpen(true)} className="flex items-center justify-center p-2 sm:px-3  border border-[#FFC107] rounded-2xl text-[#FFC107]  col-span-4 sm:col-span-1 mt-2 sm:mt-0"><LogOut className="h-4 w-4"/></button>
            </div>
         </div>
       </div>
 
-      {/* KPI CARDS - STACK ON MOBILE */}
+      {/* KPI CARDS - DYNAMIC REVENUE */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8 no-print">
         <div className="bg-gradient-to-br from-[#1e3a8a] to-[#172554] p-6 rounded-2xl shadow-xl shadow-blue-900/10 text-white relative overflow-hidden">
             <div className="absolute right-0 top-0 p-6 opacity-10"><Banknote className="h-24 w-24" /></div>
             <div className="relative z-10">
-                <p className="text-blue-200 text-xs font-bold uppercase tracking-wider mb-1">Total Revenue</p>
+                <p className="text-blue-200 text-xs font-bold uppercase tracking-wider mb-1">
+                    {activeTab === 'TRANSACTIONS' && (filters.searchQuery || filters.date || filters.status !== 'ALL') ? 'Filtered Revenue' : 'Total Revenue'}
+                </p>
                 <h2 className="text-2xl md:text-3xl font-bold tracking-tight">{isPrivacyMode ? '••••••' : formatCurrency(stats.revenue)}</h2>
             </div>
         </div>
         <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
-            <p className="text-slate-500 text-xs font-bold uppercase tracking-wider mb-1">Transactions</p>
+            <p className="text-slate-500 text-xs font-bold uppercase tracking-wider mb-1">
+                {activeTab === 'TRANSACTIONS' ? 'Filtered Transactions' : 'Total Transactions'}
+            </p>
             <h3 className="text-2xl md:text-3xl font-bold text-slate-800">{stats.txCount.toLocaleString()}</h3>
         </div>
         <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
-            <p className="text-slate-500 text-xs font-bold uppercase tracking-wider mb-1">Total Users</p>
+            <p className="text-slate-500 text-xs font-bold uppercase tracking-wider mb-1">
+                {activeTab === 'CLIENTS' ? 'Filtered Clients' : 'Total Users'}
+            </p>
             <h3 className="text-2xl md:text-3xl font-bold text-slate-800">{loading ? '...' : stats.clientCount.toLocaleString()}</h3>
         </div>
       </div>
@@ -286,12 +288,11 @@ export default function Dashboard() {
                     <button onClick={() => setShowFilters(!showFilters)} className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium border transition-colors ${showFilters ? 'bg-slate-100 border-slate-300' : 'bg-white border-slate-200'}`}>
                         <Filter className="h-4 w-4"/> Filters <ChevronDown className={`h-3 w-3 transition-transform ${showFilters ? 'rotate-180' : ''}`}/>
                     </button>
-                    <button onClick={resetFilters} className="px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 rounded-xl">Reset</button>
+                    <button onClick={resetFilters} className="px-4 py-2.5 text-sm text-[#FFC107] hover:bg-red-50 rounded-xl">Reset</button>
                 </div>
             )}
         </div>
 
-        {/* EXPANDABLE FILTERS */}
         {activeTab === 'TRANSACTIONS' && (
             <div className={`transition-all duration-300 overflow-hidden border-t border-slate-100 ${showFilters ? 'max-h-[800px] opacity-100 p-4' : 'max-h-0 opacity-0'}`}>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 bg-slate-50 p-4 rounded-xl">
@@ -299,7 +300,7 @@ export default function Dashboard() {
                     <div className="space-y-1"><label className="text-xs font-bold text-slate-500 uppercase">Date</label><input type="date" className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm" value={filters.date} onChange={(e) => setFilters({...filters, date: e.target.value})} /></div>
                     <div className="space-y-1"><label className="text-xs font-bold text-slate-500 uppercase">Payer</label><input type="text" className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm" value={filters.payer} onChange={(e) => setFilters({...filters, payer: e.target.value})} /></div>
                     <div className="space-y-1"><label className="text-xs font-bold text-slate-500 uppercase">Receiver</label><input type="text" className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm" value={filters.receiver} onChange={(e) => setFilters({...filters, receiver: e.target.value})} /></div>
-                    <div className="col-span-full pt-2"><div className="flex gap-2 items-center"><span className="text-xs font-bold text-slate-500 uppercase">Amt:</span><input type="number" placeholder="Min" className="w-24 px-2 py-1 bg-white border rounded text-sm" value={filters.minAmount} onChange={(e) => setFilters({...filters, minAmount: e.target.value})} />-<input type="number" placeholder="Max" className="w-24 px-2 py-1 bg-white border rounded text-sm" value={filters.maxAmount} onChange={(e) => setFilters({...filters, maxAmount: e.target.value})} /></div></div>
+                    <div className="col-span-full pt-2"><div className="flex gap-2 items-center"><span className="text-xs font-bold text-slate-500 uppercase">Amt:</span><input type="number" placeholder="Min" className="w-24 px-2 py-1 bg-white border rounded text-sm" value={filters.minAmount} onChange={(e) => setFilters({...filters, minAmount: e.target.value})} /><span className="text-slate-400">-</span><input type="number" placeholder="Max" className="w-24 px-2 py-1 bg-white border rounded text-sm" value={filters.maxAmount} onChange={(e) => setFilters({...filters, maxAmount: e.target.value})} /></div></div>
                 </div>
             </div>
         )}
@@ -312,7 +313,6 @@ export default function Dashboard() {
              <p className="text-sm">Generated on: {new Date().toLocaleString()}</p>
         </div>
 
-        {/* RESPONSIVE TABLE WRAPPER */}
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse min-w-[1000px] print:min-w-0">
             <thead className="bg-slate-50 text-slate-600 text-xs font-bold uppercase sticky top-0">
