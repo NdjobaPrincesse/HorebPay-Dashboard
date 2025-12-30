@@ -73,9 +73,12 @@ export default function Dashboard() {
     status: 'ALL' 
   });
 
+  // --- DATA FETCHING ---
   const fetchData = async () => {
     setLoading(true);
     try {
+      console.log("Fetching Data..."); 
+
       const [txRes, clientsRes] = await Promise.allSettled([
         api.get("/transactions"),
         api.get("/clients")
@@ -93,7 +96,7 @@ export default function Dashboard() {
           clientId: t.clientId || '?',
           operator: t.operateurNom || t.operator || 'N/A',
           product: t.produitLibelle || t.product || 'N/A',
-          paymentMethod: t.methodePaiementNom || '-', // NEW MAPPING
+          paymentMethod: t.methodePaiementNom || '-', // MAPPING API FIELD
           payerPhone: t.numeroPayeur || t.payerPhone || 'N/A',
           receiverPhone: t.numeroRecepteur || t.receiverPhone || 'N/A',
           amount: parseFloat(t.montant || t.amount || 0),
@@ -128,6 +131,7 @@ export default function Dashboard() {
 
   useEffect(() => { fetchData(); }, []);
 
+  // --- FILTER LOGIC ---
   const filteredData = useMemo(() => {
     const searchTerms = cleanStr(filters.searchQuery);
 
@@ -153,7 +157,7 @@ export default function Dashboard() {
                     cleanStr(item.clientName).includes(searchTerms) ||
                     cleanStr(item.txRef).includes(searchTerms) ||
                     cleanStr(item.product).includes(searchTerms) ||
-                    cleanStr(item.paymentMethod).includes(searchTerms); // Added to search
+                    cleanStr(item.paymentMethod).includes(searchTerms); // ADDED SEARCH SUPPORT
                 if (!match) return false;
             }
             if (searchPayer && !cleanStr(item.payerPhone).includes(searchPayer)) return false;
@@ -178,22 +182,34 @@ export default function Dashboard() {
     }
   }, [transactions, clients, filters, activeTab]);
 
+  // --- STATS ---
   const stats = useMemo(() => {
-    return {
-        revenue: transactions.filter(t => t.txStatus === 'SUCCESS').reduce((sum, t) => sum + t.amount, 0),
-        txCount: transactions.length,
-        clientCount: clients.length
-    };
-  }, [transactions, clients]);
+    if (activeTab === 'TRANSACTIONS') {
+        const visibleTxs = filteredData as Transaction[];
+        return {
+            revenue: visibleTxs.filter(t => t.txStatus === 'SUCCESS').reduce((sum, t) => sum + t.amount, 0),
+            txCount: visibleTxs.length,
+            clientCount: clients.length 
+        };
+    } else {
+        const globalRevenue = transactions.filter(t => t.txStatus === 'SUCCESS').reduce((sum, t) => sum + t.amount, 0);
+        return {
+            revenue: globalRevenue,
+            txCount: transactions.length,
+            clientCount: (filteredData as Client[]).length 
+        };
+    }
+  }, [filteredData, transactions, clients, activeTab]);
 
+  // --- EXPORT ---
   const exportCSV = () => {
     const isTx = activeTab === 'TRANSACTIONS';
     const headers = isTx 
-        ? ["Date", "Ref", "Client", "Product", "Method", "Payer", "Receiver", "Amount", "Pay Status", "Tx Status"]
+        ? ["Date", "Ref", "Client", "Product", "Method", "Payer", "Receiver", "Amount", "Pay Status", "Tx Status"] // Added Method Header
         : ["Date", "Name", "Phone", "Email", "Balance", "Status"];
     
     const rows = filteredData.map((t: any) => isTx 
-        ? [new Date(t.date).toLocaleString(), `"${t.txRef}"`, `"${t.clientName}"`, t.product, t.paymentMethod, t.payerPhone, t.receiverPhone, t.amount, t.paymentStatus, t.txStatus]
+        ? [new Date(t.date).toLocaleString(), `"${t.txRef}"`, `"${t.clientName}"`, t.product, t.paymentMethod, t.payerPhone, t.receiverPhone, t.amount, t.paymentStatus, t.txStatus] // Added Method Data
         : [new Date(t.date).toLocaleString(), `"${t.name}"`, t.phone, t.email, t.balance, t.status]
     );
 
@@ -218,24 +234,22 @@ export default function Dashboard() {
       {/* HEADER */}
       <div className="flex flex-col xl:flex-row justify-between items-start xl:items-end gap-6 pb-2 border-b border-gray-200/60 mb-8 no-print">
         <div>
-          <h1 className="text-2xl md:text-3xl font-extrabold text-[#1e3a8a] tracking-tight">Financial Dashboard</h1>
+          <h1 className="text-2xl md:text-3xl font-extrabold text-[#1e3a8a] tracking-tight">HOREB PAY</h1><h1 className = "text-2xl md:text-3xl font-extrabold text-[#FFC107] tracking-tight">Dashboard</h1>
           <p className="text-slate-500 mt-1 font-medium text-sm md:text-base">Real-time overview of HorebPay ecosystem.</p>
         </div>
 
         <div className="flex flex-col sm:flex-row gap-3 w-full xl:w-auto">
-           {/* TOGGLE */}
            <div className="flex p-1 bg-slate-100 rounded-xl border border-slate-200 w-full sm:w-auto">
                 <button onClick={() => setActiveTab('TRANSACTIONS')} className={`flex-1 sm:flex-none px-4 py-2 text-sm font-bold rounded-lg transition-all ${activeTab === 'TRANSACTIONS' ? 'bg-white shadow text-[#1e3a8a]' : 'text-slate-500 hover:text-slate-700'}`}>Transactions</button>
                 <button onClick={() => setActiveTab('CLIENTS')} className={`flex-1 sm:flex-none px-4 py-2 text-sm font-bold rounded-lg transition-all ${activeTab === 'CLIENTS' ? 'bg-white shadow text-[#1e3a8a]' : 'text-slate-500 hover:text-slate-700'}`}>Clients</button>
            </div>
 
-           {/* ACTIONS */}
            <div className="grid grid-cols-4 sm:flex sm:gap-2 gap-2">
-                <button onClick={handlePrintList} className="flex items-center justify-center p-2 sm:px-4 sm:py-2 bg-gray-800 text-white rounded-xl hover:bg-gray-900 font-semibold text-sm"><Printer className="h-4 w-4"/> <span className="hidden sm:inline ml-2">List</span></button>
-                <button onClick={() => setIsPrivacyMode(!isPrivacyMode)} className={`flex items-center justify-center p-2 sm:px-3 rounded-xl border transition-all ${isPrivacyMode ? 'bg-[#FFC107]/10 border-[#FFC107] text-[#b45309]' : 'bg-white border-slate-200 text-slate-600'}`}>{isPrivacyMode ? <EyeOff className="h-4 w-4"/> : <Eye className="h-4 w-4"/>}</button>
+                <button onClick={handlePrintList} className="flex items-center justify-center p-2 sm:px-4 sm:py-2 bg-[#1e3a8a] text-white rounded-xl  font-semibold text-sm"><Printer className="h-4 w-4"/> <span className="hidden sm:inline ml-2">List</span></button>
+                <button onClick={() => setIsPrivacyMode(!isPrivacyMode)} className={`flex items-center justify-center p-2 sm:px-3 rounded-xl border transition-all ${isPrivacyMode ? ' border-[#FFC107] text-[#FFC107]' : 'bg-white border-slate-200 text-slate-600'}`}>{isPrivacyMode ? <EyeOff className="h-4 w-4"/> : <Eye className="h-4 w-4"/>}</button>
                 <button onClick={fetchData} className="flex items-center justify-center p-2 sm:px-3 bg-white border rounded-xl text-slate-600"><RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} /></button>
                 <button onClick={exportCSV} className="flex items-center justify-center p-2 sm:px-4 bg-[#1e3a8a] text-white rounded-xl hover:bg-[#1e3a8a]/90"><Download className="h-4 w-4"/></button>
-                <button onClick={() => setIsLogoutOpen(true)} className="flex items-center justify-center p-2 sm:px-3 bg-red-50 border border-red-100 rounded-xl text-red-600 hover:bg-red-100 col-span-4 sm:col-span-1 mt-2 sm:mt-0"><LogOut className="h-4 w-4"/></button>
+                <button onClick={() => setIsLogoutOpen(true)} className="flex items-center justify-center p-2 sm:px-3  border border-[#FFC107] rounded-2xl text-[#FFC107]  col-span-4 sm:col-span-1 mt-2 sm:mt-0"><LogOut className="h-4 w-4"/></button>
            </div>
         </div>
       </div>
@@ -252,11 +266,15 @@ export default function Dashboard() {
             </div>
         </div>
         <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
-            <p className="text-slate-500 text-xs font-bold uppercase tracking-wider mb-1">{activeTab === 'TRANSACTIONS' ? 'Filtered Transactions' : 'Total Transactions'}</p>
+            <p className="text-slate-500 text-xs font-bold uppercase tracking-wider mb-1">
+                {activeTab === 'TRANSACTIONS' ? 'Filtered Transactions' : 'Total Transactions'}
+            </p>
             <h3 className="text-2xl md:text-3xl font-bold text-slate-800">{stats.txCount.toLocaleString()}</h3>
         </div>
         <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
-            <p className="text-slate-500 text-xs font-bold uppercase tracking-wider mb-1">{activeTab === 'CLIENTS' ? 'Filtered Clients' : 'Total Users'}</p>
+            <p className="text-slate-500 text-xs font-bold uppercase tracking-wider mb-1">
+                {activeTab === 'CLIENTS' ? 'Filtered Clients' : 'Total Users'}
+            </p>
             <h3 className="text-2xl md:text-3xl font-bold text-slate-800">{loading ? '...' : stats.clientCount.toLocaleString()}</h3>
         </div>
       </div>
@@ -279,7 +297,7 @@ export default function Dashboard() {
                     <button onClick={() => setShowFilters(!showFilters)} className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium border transition-colors ${showFilters ? 'bg-slate-100 border-slate-300' : 'bg-white border-slate-200'}`}>
                         <Filter className="h-4 w-4"/> Filters <ChevronDown className={`h-3 w-3 transition-transform ${showFilters ? 'rotate-180' : ''}`}/>
                     </button>
-                    <button onClick={resetFilters} className="px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 rounded-xl">Reset</button>
+                    <button onClick={resetFilters} className="px-4 py-2.5 text-sm text-[#FFC107] hover:bg-red-50 rounded-xl">Reset</button>
                 </div>
             )}
         </div>
@@ -313,7 +331,7 @@ export default function Dashboard() {
                         <th className="px-6 py-4">Date & Time</th>
                         <th className="px-6 py-4">Client</th>
                         <th className="px-6 py-4">Product/Operator</th>
-                        <th className="px-6 py-4">Method</th> {/* NEW HEADER */}
+                        <th className="px-6 py-4">Method</th> {/* NEW COLUMN HEADER */}
                         <th className="px-6 py-4">Flow (From - To)</th>
                         <th className="px-6 py-4">Amount</th>
                         <th className="px-6 py-4 text-center">Status</th>
@@ -353,9 +371,9 @@ export default function Dashboard() {
                                     <div className="text-xs text-slate-400">{t.operator}</div>
                                 </td>
                                 
-                                {/* NEW METHOD COLUMN */}
+                                {/* NEW METHOD COLUMN DATA */}
                                 <td className="px-6 py-4 whitespace-nowrap">
-                                    <span className="text-xs font-mono bg-slate-100 px-2 py-1 rounded text-slate-600">{t.paymentMethod}</span>
+                                    <span className="text-xs font-bold text-slate-500 bg-slate-100 px-2 py-1 rounded">{t.paymentMethod}</span>
                                 </td>
 
                                 <td className="px-6 py-4 text-xs whitespace-nowrap">
@@ -372,7 +390,9 @@ export default function Dashboard() {
                                     </div>
                                 </td>
                                 <td className="px-6 py-4 text-center no-print">
-                                    <button onClick={() => setSelectedTx(t)} className="p-2 text-slate-400 hover:text-[#1e3a8a] hover:bg-slate-100 rounded-full" title="Print Receipt"><Printer className="h-4 w-4"/></button>
+                                    <button onClick={() => setSelectedTx(t)} className="p-2 text-slate-400 hover:text-[#1e3a8a] hover:bg-slate-100 rounded-full" title="Print Receipt">
+                                        <Printer className="h-4 w-4"/>
+                                    </button>
                                 </td>
                             </tr>
                         );
