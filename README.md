@@ -1,202 +1,127 @@
-# Guide de Déploiement - HorebPay Dashboard
+
+#  Documentation Technique & Guide de Déploiement - HorebPay Dashboard
 
 ## Vue d'ensemble
-
-HorebPay Dashboard est une application web pour la gestion des opérations financières. Ce guide explique comment exécuter l'application en local et la déployer sur Vercel.
+Le Dashboard HorebPay est une application React conçue pour offrir une visualisation en temps réel des transactions et la gestion des clients. Elle se connecte à l'API Spring Boot via un système de **Proxy intelligent** pour contourner les problèmes de sécurité (CORS) entre le Frontend et le Backend.
 
 ---
 
-## 1. Exécution Locale sur Votre Machine
+## 1. Architecture du Code (Pour comprendre et modifier)
 
-### Prérequis
-Avant de commencer, assurez-vous d'avoir installé :
-- **Node.js** (version 16 ou supérieure) : [Télécharger ici](https://nodejs.org)
-- **npm** (livré avec Node.js)
-- **Git** (pour cloner le projet si nécessaire)
+Le code est structuré de manière modulaire pour faciliter la maintenance. Nous n'avons pas un fichier unique géant, mais une séparation logique.
 
-### Étapes d'Installation
+###  Structure des Dossiers
+```text
+src/
+├── api/                # CŒUR DU SYSTÈME (Communication Backend)
+│   ├── auth.ts         # Gère le Login (envoie userName/password) et le Logout
+│   └── axios.ts        # Configuration HTTP globale (URL de base, Token automatique)
+│
+├── components/         # ÉLÉMENTS VISUELS (Briques LEGO)
+│   ├── TransactionReceipt.tsx  # Le reçu/ticket (Design Fintech)
+│   ├── LogoutModal.tsx         # La fenêtre de confirmation de déconnexion
+│   └── ...
+│
+├── pages/              # LES ÉCRANS
+│   ├── Dashboard.tsx   # L'écran principal (Tableaux, Filtres, Calculs Revenus)
+│   └── LoginPage.tsx   # L'écran de connexion
+│
+└── index.css           # Styles globaux et configuration d'impression (Media Queries)
+```
 
-#### Étape 1 : Cloner ou Ouvrir le Projet
+###  "Où est le fichier API ?"
+Il n'y a pas un seul fichier, mais deux fichiers critiques dans le dossier `src/api/` :
+1.  **`axios.ts`** : C'est le "tuyau". Il configure l'intercepteur qui ajoute automatiquement le `Bearer Token` à chaque requête.
+2.  **`auth.ts`** : C'est la "clé". Il contient la logique spécifique pour l'endpoint `/users/login`.
+
+Toutes les autres requêtes (Transactions, Clients) sont faites directement dans `Dashboard.tsx` via `api.get('/transactions')`.
+
+---
+
+## 2. Exécution Locale (Développement)
+
+Le projet utilise **Vite** avec une configuration de Proxy pour rediriger les requêtes vers le serveur de production sans erreur CORS.
+
+### Installation
 ```bash
-# Si vous clonez depuis un repo Git :
+# 1. Cloner le projet
 git clone <url-du-repo>
 cd HorebPay-Dashboard
-```
 
-#### Étape 2 : Installer les Dépendances
-```bash
+# 2. Installer les dépendances
 npm install
-```
-Cette commande télécharge toutes les librairies nécessaires (React, TypeScript, TailwindCSS, etc.).
 
-#### Étape 3 : Configurer les Variables d'Environnement
-Créez un fichier `.env.local` à la racine du projet :
-```
-VITE_API_URL=https://prod.horebpay.com/horeb/api
-```
-
-#### Étape 4 : Lancer le Serveur de Développement
-```bash
+# 3. Lancer le serveur
 npm run dev
 ```
-L'application s'ouvrira à : `http://localhost:5173`
+L'application s'ouvrira sur `http://localhost:5173`.
 
-#### Étape 5 : Connexion
-- Accédez à `http://localhost:5173`
-- Connectez-vous avec vos identifiants HorebPay
-- Explorez le tableau de bord
+### Comment ça marche en local ?
+Le fichier `vite.config.ts` contient une règle qui dit :
+> *"Si le frontend demande `/api`, redirige la demande vers `https://prod.horebpay.com/horeb/api` en arrière-plan."*
 
-### Arrêter le Serveur
-Appuyez sur `Ctrl + C` dans le terminal.
+C'est pourquoi vous pouvez voir les données de production même en travaillant en local.
 
 ---
 
-## 2. Déploiement sur Vercel
+## 3. Déploiement & Mise à Jour (Production)
 
-### Avantages de Vercel
-- Déploiement automatique à chaque push sur Git
-- HTTPS gratuit et sécurisé
-- Performance optimisée globalement
-- Interface simple et intuitive
+Le site est hébergé sur **Vercel**. Le déploiement est **automatisé** via GitHub.
 
-### Prérequis pour Vercel
-1. **Compte GitHub** (gratuit)
-2. **Compte Vercel** (gratuit) : [Créer un compte](https://vercel.com)
+###  Le fichier critique : `vercel.json`
+Contrairement à un site statique classique, ce projet **nécessite** le fichier `vercel.json` situé à la racine. Ce fichier gère le routage complexe vers le backend Java :
+1.  Redirige `/api/auth/login` vers `/horeb/users/login`.
+2.  Redirige `/api/*` vers `/horeb/api/*`.
 
-### Étapes de Déploiement
+**Ne supprimez jamais ce fichier.**
 
-#### Étape 1 : Préparer le Projet Git
-Assurez-vous que votre code est sur GitHub :
+### Comment mettre à jour le site ?
+Vous n'avez pas besoin d'aller sur le site de Vercel.
+
+1.  Effectuez vos modifications dans le code (VS Code).
+2.  Ouvrez le terminal et lancez ces 3 commandes :
+
 ```bash
 git add .
-git commit -m "Préparation pour déploiement Vercel"
-git push origin main
+git commit -m "Description de la mise à jour (ex: Ajout filtre statut paiement)"
+git push
 ```
 
-#### Étape 2 : Se Connecter à Vercel
-1. Allez sur [vercel.com](https://vercel.com)
-2. Cliquez sur **"Sign Up"**
-3. Connectez-vous avec votre compte GitHub
-
-#### Étape 3 : Importer le Projet
-1. Cliquez sur **"Add New Project"**
-2. Sélectionnez **"Import Git Repository"**
-3. Trouvez et sélectionnez le repo `HorebPay-Dashboard`
-4. Cliquez sur **"Import"**
-
-#### Étape 4 : Configurer l'Environnement
-Avant de déployer, ajoutez les variables d'environnement :
-
-1. Dans la page de configuration du projet, allez à **"Environment Variables"**
-2. Ajoutez les variables suivantes :
-   - **Clé** : `VITE_API_URL`
-   - **Valeur** : `https://prod.horebpay.com/horeb/api`
-3. Cliquez sur **"Add"** puis **"Deploy"**
-
-#### Étape 5 : Déploiement Automatique
-- Vercel construit et déploie automatiquement
-- Vous recevrez une URL publique (ex: `https://horebpay-dashboard.vercel.app`)
-- Chaque push sur GitHub redéploie automatiquement
-
-### Configuration Vercel Avancée (Optionnel)
-
-Créez un fichier `vercel.json` à la racine pour personnaliser :
-```json
-{
-  "buildCommand": "npm run build",
-  "outputDirectory": "dist",
-  "env": {
-    "VITE_API_URL": "https://prod.horebpay.com/horeb/api"
-  }
-}
-```
+**C'est tout.** Vercel détectera le changement sur GitHub, reconstruira le projet, et le site sera à jour en moins de 2 minutes.
 
 ---
 
-## 3. Commandes Importantes
+## 4. Guide de Modification Rapide
 
-```bash
-# Développement en local
-npm run dev
+Voici où aller pour effectuer les changements les plus courants demandés par la direction :
 
-# Construire la version production
-npm run build
+### Changer les couleurs de la marque
+Le projet utilise Tailwind CSS avec des codes hexadécimaux spécifiques.
+*   **Bleu Horeb :** Rechercher et remplacer `[#1e3a8a]`
+*   **Jaune Or :** Rechercher et remplacer `[#FFC107]`
 
-# Prévisualiser la build production
-npm run preview
+### Modifier le format des montants (Bonus/Prix)
+Allez dans `src/pages/Dashboard.tsx` et cherchez la fonction :
+*   `formatCurrency` : Pour les montants principaux (arrondis).
+*   `formatBonus` : Pour les bonus (garde 2 à 4 décimales).
 
-# Vérifier la qualité du code
-npm run lint
-```
-
----
-
-## 4. Dépannage
-
-### Erreur : "Port 5173 déjà utilisé"
-```bash
-# Utilisez un autre port :
-npm run dev -- --port 3000
-```
-
-### Erreur de Connexion à l'API
-- Vérifiez que `VITE_API_URL` est correct dans `.env.local`
-- Confirmez que votre connexion Internet fonctionne
-- Vérifiez les logs du navigateur (F12 → Console)
-
-### Erreur lors du Build
-```bash
-# Supprimez les dépendances et réinstallez :
-rm -r node_modules
-npm install
-npm run build
-```
-
-### Vercel dit "Build Failed"
-- Vérifiez que Node.js 16+ est utilisé
-- Confirmez que toutes les variables d'environnement sont définies
-- Consultez les logs de build sur le dashboard Vercel
+### Ajouter une colonne au tableau
+1.  Allez dans `src/pages/Dashboard.tsx`.
+2.  Modifiez l'interface `Transaction` ou `Client` (au début du fichier).
+3.  Dans la fonction `fetchData`, mappez la nouvelle donnée venant de l'API.
+4.  Dans le `return` (HTML), ajoutez une balise `<th>` pour l'entête et `<td>` pour la donnée.
 
 ---
 
-## 5. Domaine Personnalisé (Optionnel)
-
-Pour utiliser un domaine personnalisé sur Vercel :
-1. Allez dans **"Domains"** sur le dashboard Vercel
-2. Ajoutez votre domaine
-3. Suivez les instructions pour mettre à jour vos enregistrements DNS
-
----
-
-## 6. Sécurité
-
-⚠️ **Important** :
-- Ne jamais commiter les fichiers `.env.local`
-- Gardez les tokens API confidentiels
-- Utilisez Vercel pour gérer les secrets sensibles
-- Activez l'authentification à deux facteurs sur GitHub et Vercel
-
----
-
-## Résumé Rapide
+## 5. Commandes Utiles
 
 | Action | Commande |
 |--------|----------|
 | Lancer en local | `npm run dev` |
-| Construire production | `npm run build` |
-| Déployer sur Vercel | Connectez GitHub à Vercel, importez le repo |
-| Vérifier le code | `npm run lint` |
+| Construire pour prod | `npm run build` |
+| Vérifier les erreurs | `npm run lint` |
 
 ---
-
-## Support
-
-Pour toute question ou problème :
-- Consultez la [documentation Vercel](https://vercel.com/docs)
-- Vérifiez les [logs de votre projet Vercel](https://vercel.com/dashboard)
-- Contactez l'équipe de développement
-
----
-
-**Date de création** : Décembre 2025  
-**Dernière mise à jour** : Décembre 2025
+**Date de creation:** Novembre 2025
+**Dernière mise à jour :** Janvier 2026
+**Responsable Technique :** Équipe Frontend HorebPay

@@ -22,7 +22,7 @@ interface Transaction {
   payerPhone: string;
   receiverPhone: string;
   amount: number;
-  bonus: number; // NEW FIELD
+  bonus: number; 
   paymentStatus: string; 
   txStatus: string;
 }
@@ -38,7 +38,18 @@ interface Client {
 }
 
 // --- HELPERS ---
-const formatCurrency = (val: number) => new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'XOF' }).format(val);
+
+// 1. Standard Currency (Arrondit souvent le XOF)
+const formatCurrency = (val: number) => 
+  new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'XOF' }).format(val);
+
+// 2. NEW: Bonus Formatter (Force les décimales)
+const formatBonus = (val: number) => {
+  return new Intl.NumberFormat('fr-FR', { 
+    minimumFractionDigits: 2, 
+    maximumFractionDigits: 4 // Permet jusqu'à 4 décimales si nécessaire
+  }).format(val) + ' FCFA';
+};
 
 const normalizeStatus = (status: any) => {
   if (!status) return 'PENDING';
@@ -64,17 +75,8 @@ export default function Dashboard() {
   const [selectedTx, setSelectedTx] = useState<Transaction | null>(null);
   const [isLogoutOpen, setIsLogoutOpen] = useState(false);
 
-  // UPDATED FILTER STATE
   const [filters, setFilters] = useState({
-    startDate: '', // Changed from single date
-    endDate: '',   // Added end date
-    searchQuery: '', 
-    payer: '',       
-    receiver: '',    
-    minAmount: '',
-    maxAmount: '',
-    txStatus: 'ALL',      // Specific for Transaction Status
-    paymentStatus: 'ALL'  // New specific Payment Status filter
+    startDate: '', endDate: '', searchQuery: '', payer: '', receiver: '', minAmount: '', maxAmount: '', txStatus: 'ALL', paymentStatus: 'ALL'
   });
 
   // --- DATA FETCHING ---
@@ -104,7 +106,7 @@ export default function Dashboard() {
           payerPhone: t.numeroPayeur || t.payerPhone || 'N/A',
           receiverPhone: t.numeroRecepteur || t.receiverPhone || 'N/A',
           amount: parseFloat(t.montant || t.amount || 0),
-          bonus: parseFloat(t.bonus || 0), // MAPPING BONUS
+          bonus: parseFloat(t.bonus || 0), // Mapping raw bonus
           paymentStatus: normalizeStatus(t.statusPaiement),
           txStatus: normalizeStatus(t.statusTransaction || t.status)
         }));
@@ -136,7 +138,7 @@ export default function Dashboard() {
 
   useEffect(() => { fetchData(); }, []);
 
-  // --- FILTER LOGIC ---
+  // --- FILTER LOGIC (UNCHANGED) ---
   const filteredData = useMemo(() => {
     const searchTerms = cleanStr(filters.searchQuery);
 
@@ -146,10 +148,8 @@ export default function Dashboard() {
         const minAmt = filters.minAmount ? parseFloat(filters.minAmount) : null;
         const maxAmt = filters.maxAmount ? parseFloat(filters.maxAmount) : null;
         
-        // Date Range Logic
         let startTimestamp = 0;
         let endTimestamp = Infinity;
-
         if (filters.startDate) {
             const d = new Date(filters.startDate);
             d.setHours(0,0,0,0);
@@ -163,32 +163,19 @@ export default function Dashboard() {
 
         return transactions.filter(item => {
             if (searchTerms) {
-                const match = 
-                    cleanStr(item.clientName).includes(searchTerms) ||
-                    cleanStr(item.txRef).includes(searchTerms) ||
-                    cleanStr(item.product).includes(searchTerms) ||
-                    cleanStr(item.paymentMethod).includes(searchTerms);
+                const match = cleanStr(item.clientName).includes(searchTerms) || cleanStr(item.txRef).includes(searchTerms) || cleanStr(item.product).includes(searchTerms) || cleanStr(item.paymentMethod).includes(searchTerms);
                 if (!match) return false;
             }
-            
-            // Text Fields
             if (searchPayer && !cleanStr(item.payerPhone).includes(searchPayer)) return false;
             if (searchReceiver && !cleanStr(item.receiverPhone).includes(searchReceiver)) return false;
-            
-            // Amount Range
             if (minAmt !== null && item.amount < minAmt) return false;
             if (maxAmt !== null && item.amount > maxAmt) return false;
-            
-            // Statuses (Specific Filters)
             if (filters.txStatus !== 'ALL' && item.txStatus !== filters.txStatus) return false;
             if (filters.paymentStatus !== 'ALL' && item.paymentStatus !== filters.paymentStatus) return false;
-            
-            // Date Range
             if (filters.startDate || filters.endDate) {
                 const itemTime = new Date(item.date).getTime();
                 if (itemTime < startTimestamp || itemTime > endTimestamp) return false;
             }
-            
             return true;
         });
     } else {
@@ -199,7 +186,6 @@ export default function Dashboard() {
     }
   }, [transactions, clients, filters, activeTab]);
 
-  // --- STATS ---
   const stats = useMemo(() => {
     if (activeTab === 'TRANSACTIONS') {
         const visibleTxs = filteredData as Transaction[];
@@ -218,12 +204,10 @@ export default function Dashboard() {
     }
   }, [filteredData, transactions, clients, activeTab]);
 
-  // --- EXPORT ---
   const exportCSV = () => {
     const isTx = activeTab === 'TRANSACTIONS';
-    // Added Bonus to Headers
     const headers = isTx 
-        ? ["Date", "Ref", "Client", "Product", "Method", "Payer", "Receiver", "Amount", "Bonus", "Pay Status", "Tx Status"] 
+        ? ["Date", "Ref", "Client", "Product", "Method", "Payer", "Receiver", "Amount", "Bonus", "Pay Status", "Tx Status"]
         : ["Date", "Name", "Phone", "Email", "Balance", "Status"];
     
     const rows = filteredData.map((t: any) => isTx 
@@ -240,13 +224,8 @@ export default function Dashboard() {
     document.body.removeChild(link);
   };
 
-  const handlePrintList = () => {
-    window.print();
-  };
-
-  const resetFilters = () => setFilters({ 
-    startDate: '', endDate: '', searchQuery: '', payer: '', receiver: '', minAmount: '', maxAmount: '', txStatus: 'ALL', paymentStatus: 'ALL' 
-  });
+  const handlePrintList = () => { window.print(); };
+  const resetFilters = () => setFilters({ startDate: '', endDate: '', searchQuery: '', payer: '', receiver: '', minAmount: '', maxAmount: '', txStatus: 'ALL', paymentStatus: 'ALL' });
 
   return (
     <div className="min-h-screen w-full font-sans text-slate-800 pb-20 p-4 md:p-6 lg:p-8">
@@ -286,15 +265,11 @@ export default function Dashboard() {
             </div>
         </div>
         <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
-            <p className="text-slate-500 text-xs font-bold uppercase tracking-wider mb-1">
-                {activeTab === 'TRANSACTIONS' ? 'Filtered Transactions' : 'Total Transactions'}
-            </p>
+            <p className="text-slate-500 text-xs font-bold uppercase tracking-wider mb-1">{activeTab === 'TRANSACTIONS' ? 'Filtered Transactions' : 'Total Transactions'}</p>
             <h3 className="text-2xl md:text-3xl font-bold text-slate-800">{stats.txCount.toLocaleString()}</h3>
         </div>
         <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
-            <p className="text-slate-500 text-xs font-bold uppercase tracking-wider mb-1">
-                {activeTab === 'CLIENTS' ? 'Filtered Clients' : 'Total Users'}
-            </p>
+            <p className="text-slate-500 text-xs font-bold uppercase tracking-wider mb-1">{activeTab === 'CLIENTS' ? 'Filtered Clients' : 'Total Users'}</p>
             <h3 className="text-2xl md:text-3xl font-bold text-slate-800">{loading ? '...' : stats.clientCount.toLocaleString()}</h3>
         </div>
       </div>
@@ -304,20 +279,12 @@ export default function Dashboard() {
         <div className="p-4 flex flex-col md:flex-row gap-4">
             <div className="relative flex-1 w-full">
                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-                 <input 
-                    type="text" 
-                    placeholder={activeTab === 'TRANSACTIONS' ? "Search Ref, Client, Method..." : "Search Client Name, Phone..."}
-                    className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:border-[#FFC107] focus:ring-1 focus:ring-[#FFC107]" 
-                    value={filters.searchQuery} 
-                    onChange={(e) => setFilters({...filters, searchQuery: e.target.value})} 
-                 />
+                 <input type="text" placeholder={activeTab === 'TRANSACTIONS' ? "Search Ref, Client, Method..." : "Search Client Name, Phone..."} className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:border-[#FFC107] focus:ring-1 focus:ring-[#FFC107]" value={filters.searchQuery} onChange={(e) => setFilters({...filters, searchQuery: e.target.value})} />
             </div>
             {activeTab === 'TRANSACTIONS' && (
                 <div className="flex gap-2">
-                    <button onClick={() => setShowFilters(!showFilters)} className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium border transition-colors ${showFilters ? 'bg-slate-100 border-slate-300' : 'bg-white border-slate-200'}`}>
-                        <Filter className="h-4 w-4"/> Filters <ChevronDown className={`h-3 w-3 transition-transform ${showFilters ? 'rotate-180' : ''}`}/>
-                    </button>
-                    <button onClick={resetFilters} className="px-4 py-2.5 text-sm text-[#1e3a8a] hover:bg-red-50 rounded-xl">Reset</button>
+                    <button onClick={() => setShowFilters(!showFilters)} className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium border transition-colors ${showFilters ? 'bg-slate-100 border-slate-300' : 'bg-white border-slate-200'}`}><Filter className="h-4 w-4"/> Filters <ChevronDown className={`h-3 w-3 transition-transform ${showFilters ? 'rotate-180' : ''}`}/></button>
+                    <button onClick={resetFilters} className="px-4 py-2.5 text-sm text-[#1e3a8a] hover:bg-blue-50 rounded-xl">Reset</button>
                 </div>
             )}
         </div>
@@ -325,44 +292,12 @@ export default function Dashboard() {
         {activeTab === 'TRANSACTIONS' && (
             <div className={`transition-all duration-300 overflow-hidden border-t border-slate-100 ${showFilters ? 'max-h-[800px] opacity-100 p-4' : 'max-h-0 opacity-0'}`}>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 bg-slate-50 p-4 rounded-xl">
-                    
-                    {/* Tx Status Filter */}
-                    <div className="space-y-1">
-                        <label className="text-xs font-bold text-slate-500 uppercase">Tx Status</label>
-                        <select className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm" value={filters.txStatus} onChange={(e) => setFilters({...filters, txStatus: e.target.value})}>
-                            <option value="ALL">All</option><option value="SUCCESS">Success</option><option value="FAILED">Failed</option><option value="PENDING">Pending</option>
-                        </select>
-                    </div>
-
-                    {/* NEW: Payment Status Filter */}
-                    <div className="space-y-1">
-                        <label className="text-xs font-bold text-slate-500 uppercase">Payment Status</label>
-                        <select className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm" value={filters.paymentStatus} onChange={(e) => setFilters({...filters, paymentStatus: e.target.value})}>
-                            <option value="ALL">All</option><option value="SUCCESS">Success</option><option value="FAILED">Failed</option><option value="PENDING">Pending</option>
-                        </select>
-                    </div>
-
-                    {/* NEW: Date Range */}
-                    <div className="space-y-1 sm:col-span-2">
-                        <label className="text-xs font-bold text-slate-500 uppercase">Date Range</label>
-                        <div className="flex gap-2">
-                            <input type="date" className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm" value={filters.startDate} onChange={(e) => setFilters({...filters, startDate: e.target.value})} placeholder="Start" />
-                            <span className="self-center text-slate-400">to</span>
-                            <input type="date" className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm" value={filters.endDate} onChange={(e) => setFilters({...filters, endDate: e.target.value})} placeholder="End" />
-                        </div>
-                    </div>
-
+                    <div className="space-y-1"><label className="text-xs font-bold text-slate-500 uppercase">Tx Status</label><select className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm" value={filters.txStatus} onChange={(e) => setFilters({...filters, txStatus: e.target.value})}><option value="ALL">All</option><option value="SUCCESS">Success</option><option value="FAILED">Failed</option><option value="PENDING">Pending</option></select></div>
+                    <div className="space-y-1"><label className="text-xs font-bold text-slate-500 uppercase">Payment Status</label><select className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm" value={filters.paymentStatus} onChange={(e) => setFilters({...filters, paymentStatus: e.target.value})}><option value="ALL">All</option><option value="SUCCESS">Success</option><option value="FAILED">Failed</option><option value="PENDING">Pending</option></select></div>
+                    <div className="space-y-1 sm:col-span-2"><label className="text-xs font-bold text-slate-500 uppercase">Date Range</label><div className="flex gap-2"><input type="date" className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm" value={filters.startDate} onChange={(e) => setFilters({...filters, startDate: e.target.value})} /><span className="self-center text-slate-400">to</span><input type="date" className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm" value={filters.endDate} onChange={(e) => setFilters({...filters, endDate: e.target.value})} /></div></div>
                     <div className="space-y-1"><label className="text-xs font-bold text-slate-500 uppercase">Payer Phone</label><input type="text" placeholder="e.g. 699..." className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm" value={filters.payer} onChange={(e) => setFilters({...filters, payer: e.target.value})} /></div>
                     <div className="space-y-1"><label className="text-xs font-bold text-slate-500 uppercase">Receiver Phone</label><input type="text" placeholder="e.g. 677..." className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm" value={filters.receiver} onChange={(e) => setFilters({...filters, receiver: e.target.value})} /></div>
-                    
-                    <div className="col-span-full sm:col-span-2 pt-2 lg:pt-0 flex items-end">
-                        <div className="flex gap-2 items-center w-full">
-                            <span className="text-xs font-bold text-slate-500 uppercase w-12">Amt:</span>
-                            <input type="number" placeholder="Min" className="w-full px-3 py-2 bg-white border rounded-lg text-sm" value={filters.minAmount} onChange={(e) => setFilters({...filters, minAmount: e.target.value})} />
-                            <span className="text-slate-400">-</span>
-                            <input type="number" placeholder="Max" className="w-full px-3 py-2 bg-white border rounded-lg text-sm" value={filters.maxAmount} onChange={(e) => setFilters({...filters, maxAmount: e.target.value})} />
-                        </div>
-                    </div>
+                    <div className="col-span-full sm:col-span-2 pt-2 lg:pt-0 flex items-end"><div className="flex gap-2 items-center w-full"><span className="text-xs font-bold text-slate-500 uppercase w-12">Amt:</span><input type="number" placeholder="Min" className="w-full px-3 py-2 bg-white border rounded-lg text-sm" value={filters.minAmount} onChange={(e) => setFilters({...filters, minAmount: e.target.value})} /><span className="text-slate-400">-</span><input type="number" placeholder="Max" className="w-full px-3 py-2 bg-white border rounded-lg text-sm" value={filters.maxAmount} onChange={(e) => setFilters({...filters, maxAmount: e.target.value})} /></div></div>
                 </div>
             </div>
         )}
@@ -387,7 +322,7 @@ export default function Dashboard() {
                         <th className="px-6 py-4">Method</th>
                         <th className="px-6 py-4">Flow (From - To)</th>
                         <th className="px-6 py-4">Amount</th>
-                        <th className="px-6 py-4">Bonus</th> {/* NEW COLUMN */}
+                        <th className="px-6 py-4">Bonus</th>
                         <th className="px-6 py-4 text-center">Status</th>
                         <th className="px-6 py-4 text-center no-print">Print</th>
                     </>
@@ -425,9 +360,7 @@ export default function Dashboard() {
                                     <div className="text-xs text-slate-400">{t.operator}</div>
                                 </td>
                                 
-                                <td className="px-6 py-4 whitespace-nowrap">
-                                    <span className="text-xs font-bold text-slate-500 bg-slate-100 px-2 py-1 rounded">{t.paymentMethod}</span>
-                                </td>
+                                <td className="px-6 py-4 whitespace-nowrap"><span className="text-xs font-bold text-slate-500 bg-slate-100 px-2 py-1 rounded">{t.paymentMethod}</span></td>
 
                                 <td className="px-6 py-4 text-xs whitespace-nowrap">
                                     <div className="flex flex-col gap-1">
@@ -437,8 +370,8 @@ export default function Dashboard() {
                                 </td>
                                 <td className="px-6 py-4 font-bold text-[#1e3a8a] whitespace-nowrap">{isPrivacyMode ? '****' : formatCurrency(t.amount)}</td>
                                 
-                                {/* NEW BONUS DATA */}
-                                <td className="px-6 py-4 font-bold text-[#1e3a8a] whitespace-nowrap">{isPrivacyMode ? '****' : formatCurrency(t.bonus)}</td>
+                                {/* BONUS COLUMN WITH NEW FORMATTER */}
+                                <td className="px-6 py-4 font-bold text-[#1e3a8a] whitespace-nowrap">{isPrivacyMode ? '****' : formatBonus(t.bonus)}</td>
 
                                 <td className="px-6 py-4">
                                     <div className="flex flex-col gap-1.5 items-center">
@@ -447,9 +380,7 @@ export default function Dashboard() {
                                     </div>
                                 </td>
                                 <td className="px-6 py-4 text-center no-print">
-                                    <button onClick={() => setSelectedTx(t)} className="p-2 text-slate-400 hover:text-[#1e3a8a] hover:bg-slate-100 rounded-full" title="Print Receipt">
-                                        <Printer className="h-4 w-4"/>
-                                    </button>
+                                    <button onClick={() => setSelectedTx(t)} className="p-2 text-slate-400 hover:text-[#1e3a8a] hover:bg-slate-100 rounded-full" title="Print Receipt"><Printer className="h-4 w-4"/></button>
                                 </td>
                             </tr>
                         );
