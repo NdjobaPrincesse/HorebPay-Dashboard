@@ -1,44 +1,38 @@
-import api from './axios';
+// 1. Import the new Service
+import { ApiService } from './services'; 
 
 export const login = async (userName: string, password: string) => {
-  console.log("Attempting login...");
+  console.log("Attempting login for:", userName);
 
-  const response = await api.post('/auth/login', {
+  // 2. Use the Service call
+  const response = await ApiService.auth.login({
     userName: userName,
-    password: password 
+    password: password
   });
 
-  console.log("Response Body:", response.data);
-  console.log("Response Headers:", response.headers);
+  console.log("Login Response:", response.data);
 
-  // 1. Try to find token in JSON Body
-  let token = response.data.token || response.data.accessToken || response.data.jwt;
+  // Robust Token Detection
+  const token = response.data.token || response.data.accessToken || response.data.jwt || response.data.bearerToken;
+  const user = response.data.user || response.data.userDetails || { userName };
 
-  // 2. Try to find token in Headers (Common in Java Apps)
-  if (!token) {
-     const authHeader = response.headers['authorization'] || response.headers['Authorization'];
-     if (authHeader && authHeader.startsWith('Bearer ')) {
-         token = authHeader.substring(7); // Remove 'Bearer '
-         console.log("Token found in Headers!");
-     }
-  }
-
-  // 3. LOGIC DECISION
   if (token) {
-    // CASE A: We found a token (Body or Header)
     localStorage.setItem('token', token);
-    localStorage.setItem('user', JSON.stringify({ userName }));
+    localStorage.setItem('user', JSON.stringify(user));
     return response.data;
   } else {
-    // CASE B: No token found, but 200 OK received. 
-    // This means it's a COOKIE-BASED login.
-    console.log("No token string found. Assuming Cookie/Session Auth.");
+    // Check headers if body is empty
+    const authHeader = response.headers['authorization'];
+    if (authHeader) {
+        localStorage.setItem('token', authHeader.replace('Bearer ', ''));
+        localStorage.setItem('user', JSON.stringify({ userName }));
+        return response.data;
+    }
     
-    // We set a "flag" so our App knows we are logged in.
-    // The browser handles the actual cookie security automatically.
-    localStorage.setItem('token', 'cookie-session-active'); 
+    // Cookie Fallback
+    console.log("Assuming Cookie Auth");
+    localStorage.setItem('token', 'cookie-session');
     localStorage.setItem('user', JSON.stringify({ userName }));
-    
     return response.data;
   }
 };

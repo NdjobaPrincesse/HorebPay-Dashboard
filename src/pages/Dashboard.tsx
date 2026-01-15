@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import api from '../api/axios'; 
 import { logout } from '../api/auth';
+import { ApiService } from '../api/services'; 
 import TransactionReceipt from '../components/TransactionReceipt';
 import LogoutModal from '../components/LogoutModal';
 
@@ -86,8 +87,8 @@ export default function Dashboard() {
       console.log("Fetching Data..."); 
 
       const [txRes, clientsRes] = await Promise.allSettled([
-        api.get("/transactions"),
-        api.get("/clients")
+        ApiService.dashboard.getTransactions(),
+        ApiService.dashboard.getClients()
       ]);
 
       if (txRes.status === 'fulfilled') {
