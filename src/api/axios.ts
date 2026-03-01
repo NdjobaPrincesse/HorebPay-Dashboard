@@ -1,5 +1,6 @@
 import axios from 'axios';
 
+// Determine Environment
 const baseURL = import.meta.env.VITE_API_URL || '/api';
 
 const api = axios.create({
@@ -7,10 +8,12 @@ const api = axios.create({
   headers: {
     'Content-Type': 'application/json',
   },
-  // CRITICAL: This allows cookies to be sent/received
+  // CRITICAL: This allows the Server's Cookie to stick
   withCredentials: true 
 });
 
+// We don't need to manually attach a token anymore if using Cookies,
+// but we leave this here just in case you switch back to JWT later.
 api.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem('token');
@@ -25,9 +28,11 @@ api.interceptors.request.use(
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    // Keep your debugging logs
     if (error.response?.status === 401) {
-       console.warn("401 Unauthorized - Session might be expired");
+       console.warn("Session Expired or Invalid");
+       // Optional: Auto-logout if cookie dies
+       // localStorage.removeItem('userId');
+       // window.location.href = '/login';
     }
     return Promise.reject(error);
   }

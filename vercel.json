@@ -2,11 +2,15 @@
   "rewrites": [
     {
       "source": "/api/auth/login",
-      "destination": "https://prod.horebpay.com/horeb/api/users/login"
+      "destination": "http://158.220.104.62:8089/horeb/api/users/login"
+    },
+    {
+      "source": "/api/enterprise",
+      "destination": "http://158.220.104.62:8089/horeb/api/entreprise"
     },
     {
       "source": "/api/:match*",
-      "destination": "https://prod.horebpay.com/horeb/api/:match*"
+      "destination": "http://158.220.104.62:8089/horeb/api/:match*"
     },
     {
       "source": "/(.*)",

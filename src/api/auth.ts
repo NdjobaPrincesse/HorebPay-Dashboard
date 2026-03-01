@@ -1,48 +1,41 @@
-// 1. Import the new Service
-import { ApiService } from './services'; 
+import { ApiService } from './services';
 
 export const login = async (userName: string, password: string) => {
-  console.log("Attempting login for:", userName);
+  console.log("Attempting login...");
 
-  // 2. Use the Service call
   const response = await ApiService.auth.login({
     userName: userName,
-    password: password
+    password: password 
   });
 
   console.log("Login Response:", response.data);
 
-  // Robust Token Detection
-  const token = response.data.token || response.data.accessToken || response.data.jwt || response.data.bearerToken;
-  const user = response.data.user || response.data.userDetails || { userName };
+  // 1. EXTRACT USER ID
+  const { userId, message } = response.data;
 
-  if (token) {
-    localStorage.setItem('token', token);
-    localStorage.setItem('user', JSON.stringify(user));
-    return response.data;
-  } else {
-    // Check headers if body is empty
-    const authHeader = response.headers['authorization'];
-    if (authHeader) {
-        localStorage.setItem('token', authHeader.replace('Bearer ', ''));
-        localStorage.setItem('user', JSON.stringify({ userName }));
-        return response.data;
-    }
+  if (userId || response.status === 200) {
+    const validId = userId || 'unknown-id';
     
-    // Cookie Fallback
-    console.log("Assuming Cookie Auth");
-    localStorage.setItem('token', 'cookie-session');
-    localStorage.setItem('user', JSON.stringify({ userName }));
+    // 2. STORE AS CLIENT INITIATOR (Crucial Step)
+    // This allows services.ts to read it later for recharges/deposits
+    localStorage.setItem('clientInitiator', validId); 
+    
+    // Store standard auth flags
+    localStorage.setItem
+    localStorage.setItem('userId', validId);
+    localStorage.setItem('user', JSON.stringify({ userName, userId: validId }));
+    
     return response.data;
-  }
+  } 
+  
+  throw new Error(message || "Login failed.");
 };
 
 export const logout = () => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
+    localStorage.clear();
     window.location.href = '/login';
 };
 
 export const isAuthenticated = () => {
-    return !!localStorage.getItem('token');
+    return !!localStorage.getItem('userId');
 };

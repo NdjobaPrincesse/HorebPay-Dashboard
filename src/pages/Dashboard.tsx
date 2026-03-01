@@ -1,430 +1,509 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { 
   Users, Banknote, Download, Filter, Search, RefreshCw, 
-  Eye, EyeOff, ChevronDown, CheckCircle2, XCircle, AlertCircle, 
-  ArrowRight, Wallet, Database, Printer, Calendar, LogOut
+  Eye, EyeOff, ChevronDown, CheckCircle2, ArrowRight, Wallet, Printer, LogOut, 
+  Building2, Zap, Clock, ShieldCheck, ArrowDownCircle
 } from 'lucide-react';
-import api from '../api/axios'; 
+import { ApiService } from '../api/services';
 import { logout } from '../api/auth';
-import { ApiService } from '../api/services'; 
+import type { Transaction, Client, Enterprise } from '../types';
+import { formatCurrency, cleanStr, normalizeStatus } from '../utils/formatters';
+
+// COMPONENTS
 import TransactionReceipt from '../components/TransactionReceipt';
 import LogoutModal from '../components/LogoutModal';
-
-// --- TYPES ---
-interface Transaction {
-  id: string;
-  txRef: string;
-  date: string;
-  clientName: string;
-  clientId: string;
-  operator: string;
-  product: string;
-  paymentMethod: string;
-  payerPhone: string;
-  receiverPhone: string;
-  amount: number;
-  bonus: number; 
-  paymentStatus: string; 
-  txStatus: string;
-}
-
-interface Client {
-  id: string;
-  name: string;
-  phone: string;
-  email: string;
-  balance: number;
-  status: string;
-  date: string;
-}
-
-// --- HELPERS ---
-
-// 1. Standard Currency (Arrondit souvent le XOF)
-const formatCurrency = (val: number) => 
-  new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'XOF' }).format(val);
-
-// 2. NEW: Bonus Formatter (Force les décimales)
-const formatBonus = (val: number) => {
-  return new Intl.NumberFormat('fr-FR', { 
-    minimumFractionDigits: 2, 
-    maximumFractionDigits: 4 // Permet jusqu'à 4 décimales si nécessaire
-  }).format(val) + ' FCFA';
-};
-
-const normalizeStatus = (status: any) => {
-  if (!status) return 'PENDING';
-  const s = String(status).toUpperCase().trim();
-  if (['SUCCESS', 'SUCCES', 'PAYE', 'PAID', 'COMPLETED', 'TERMINÉ'].includes(s)) return 'SUCCESS';
-  if (['FAILED', 'ECHEC', 'CANCELLED', 'REJETÉ', 'REJETE'].includes(s)) return 'FAILED';
-  return 'PENDING';
-};
-
-const cleanStr = (str: string | null | undefined): string => {
-  if (!str) return '';
-  return str.toString().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
-};
+import EnterpriseRechargeModal from '../components/EnterpriseRechargeModal';
+import DepositModal from '../components/DepositModal';
+import ConfirmationModal from '../components/ConfirmationModal';
+import { KPICard } from '../components/dashboard/ui/KPICard';
+import { TabButton } from '../components/dashboard/ui/TabButton';
+import { ActionIconBtn } from '../components/dashboard/ui/ActionIconBtn';
+import { TransactionsTable } from '../components/dashboard/tables/TransactionsTable';
+import { ClientsTable } from '../components/dashboard/tables/ClientsTable';
+import { EnterprisesTable } from '../components/dashboard/tables/EnterprisesTable';
 
 export default function Dashboard() {
-  const [activeTab, setActiveTab] = useState<'TRANSACTIONS' | 'CLIENTS'>('TRANSACTIONS');
+  const [activeTab, setActiveTab] = useState<'TRANSACTIONS' | 'CLIENTS' | 'ENTERPRISES'>('TRANSACTIONS');
+  
+  // DATA STATE
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
+  const [enterprises, setEnterprises] = useState<Enterprise[]>([]);
+  
+  // UI STATE
   const [loading, setLoading] = useState(true);
   const [isPrivacyMode, setIsPrivacyMode] = useState(false);
   const [showFilters, setShowFilters] = useState(false); 
   
+  // MODAL STATES
   const [selectedTx, setSelectedTx] = useState<Transaction | null>(null);
   const [isLogoutOpen, setIsLogoutOpen] = useState(false);
+  const [isRechargeOpen, setIsRechargeOpen] = useState(false);
+  const [rechargeId, setRechargeId] = useState('');
+  const [rechargeName, setRechargeName] = useState('');
+  
+  const [isDepositOpen, setIsDepositOpen] = useState(false);
+  const [depositClientPhone, setDepositClientPhone] = useState('');
+
+  const [isDenyModalOpen, setIsDenyModalOpen] = useState(false);
+  const [denyId, setDenyId] = useState('');
 
   const [filters, setFilters] = useState({
-    startDate: '', endDate: '', searchQuery: '', payer: '', receiver: '', minAmount: '', maxAmount: '', txStatus: 'ALL', paymentStatus: 'ALL'
+    startDate: '',
+    endDate: '',
+    searchQuery: '',
+    payer: '',
+    receiver: '',
+    minAmount: '',
+    maxAmount: '',
+    txStatus: 'ALL',
+    paymentStatus: 'ALL',
+    enterpriseStartDate: '',
+    enterpriseEndDate: '',
   });
 
-  // --- DATA FETCHING ---
   const fetchData = async () => {
     setLoading(true);
     try {
       console.log("Fetching Data..."); 
-
-      const [txRes, clientsRes] = await Promise.allSettled([
+      const [txRes, clientsRes, entRes] = await Promise.allSettled([
         ApiService.dashboard.getTransactions(),
-        ApiService.dashboard.getClients()
+        ApiService.dashboard.getClients(),
+        ApiService.enterprise.getAll()
       ]);
 
       if (txRes.status === 'fulfilled') {
         const rawData = txRes.value.data;
         const txData = Array.isArray(rawData) ? rawData : (rawData.content || []);
-        
-        const formattedTx = txData.map((t: any) => ({
-          id: t.transactionsId || t.id || Math.random().toString(),
-          txRef: t.transactionsId || t.txRef || 'REF-N/A',
-          date: t.date || t.createdAt || new Date().toISOString(),
-          clientName: t.clientNom || t.clientName || 'Unknown',
-          clientId: t.clientId || '?',
-          operator: t.operateurNom || t.operator || 'N/A',
-          product: t.produitLibelle || t.product || 'N/A',
-          paymentMethod: t.methodePaiementNom || '-',
-          payerPhone: t.numeroPayeur || t.payerPhone || 'N/A',
-          receiverPhone: t.numeroRecepteur || t.receiverPhone || 'N/A',
-          amount: parseFloat(t.montant || t.amount || 0),
-          bonus: parseFloat(t.bonus || 0), // Mapping raw bonus
-          paymentStatus: normalizeStatus(t.statusPaiement),
-          txStatus: normalizeStatus(t.statusTransaction || t.status)
-        }));
-        setTransactions(formattedTx.sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime()));
+        setTransactions(
+          txData.map((t: any) => ({
+            id: t.transactionsId || t.id,
+            txRef: t.transactionsId || t.txRef || 'REF-N/A',
+            date: t.date || t.createdAt,
+            clientName: t.clientNom || 'Unknown',
+            clientId: t.clientId || '?',
+            operator: t.operateurNom || 'N/A',
+            product: t.produitLibelle || 'N/A',
+            paymentMethod: t.methodePaiementNom || '-',
+            payerPhone: t.numeroPayeur || 'N/A',
+            receiverPhone: t.numeroRecepteur || 'N/A',
+            amount: parseFloat(t.montant || 0),
+            bonus: parseFloat(t.bonus || 0), 
+            paymentStatus: normalizeStatus(t.statusPaiement),
+            txStatus: normalizeStatus(t.statusTransaction || t.status)
+          }))
+          .sort((a: Transaction, b: Transaction) => // ← Fixed implicit any
+            new Date(b.date).getTime() - new Date(a.date).getTime()
+          )
+        );
       }
 
       if (clientsRes.status === 'fulfilled') {
         const rawData = clientsRes.value.data;
         const clientsData = Array.isArray(rawData) ? rawData : (rawData.content || []);
-        
-        const formattedClients = clientsData.map((c: any) => ({
-          id: c.clientId || c.id,
-          name: `${c.nom || ''} ${c.prenom || ''}`.trim() || c.name || 'Unknown',
-          phone: c.telephone || c.phone || 'N/A',
-          email: c.email || 'N/A',
-          balance: parseFloat(c.balance || 0),
-          status: c.email ? 'Active' : 'Guest',
-          date: c.createdAt || c.date || new Date().toISOString()
-        }));
-        setClients(formattedClients.sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime()));
+        setClients(
+          clientsData.map((c: any) => ({
+            clientId: c.clientId || c.id,
+            nom: c.nom || '',
+            prenom: c.prenom || '',
+            phone: c.telephone || 'N/A',
+            email: c.email || 'N/A',
+            date: c.date || c.createdAt,
+            solde: parseFloat(c.solde || 0),
+            soldeBonus: parseFloat(c.soldeBonus || 0),
+            firstLogin: c.firstLogin ?? true,
+            name: [c.nom, c.prenom].filter(Boolean).join(' ').trim() || 'Unknown',
+            status: c.firstLogin ? 'First Login' : 'Active',
+          }))
+          .sort((a: Client, b: Client) => // ← Fixed implicit any
+            new Date(b.date).getTime() - new Date(a.date).getTime()
+          )
+        );
       }
 
-    } catch (e) {
-      console.error("Fetch Error", e);
-    } finally {
-      setLoading(false);
+      if (entRes.status === 'fulfilled') {
+        const rawData = entRes.value.data;
+        const entData = Array.isArray(rawData) ? rawData : (rawData.content || []);
+
+        console.log('[RAW ENTERPRISES FROM API]', entData);
+
+        setEnterprises(
+          entData.map((e: any): Enterprise => ({
+            entrepriseId: e.entrepriseId || e.id || '',
+            nom: e.nom || 'Unknown',
+            rccm: e.rccm || '',
+            niu: e.niu || '',
+            email: e.email || e.responsableEmail || '',
+            telephone: e.telephone || '',
+            lieu: e.lieu || '',
+            rue: e.rue || '',
+            boitePostale: e.boitePostale || '',
+            status: e.status || 'PENDING',
+            dateCreationEntreprise: e.dateCreationEntreprise 
+              || e.datecreationentreprises 
+              || new Date().toISOString(),
+            responsableNom: e.responsableNom 
+              || e.nomduresponsable 
+              || '-',
+            responsablePrenom: e.responsablePrenom || '',
+            responsableTelephone: e.responsableTelephone 
+              || e.numeroduresponsable 
+              || '-',
+            responsableEmail: e.responsableEmail || '',
+            isValidated: e.status === 'STATUS_APPROVED' || e.status === 'APPROVED',
+          }))
+          .sort((a: Enterprise, b: Enterprise) => {
+            const dateA = new Date(a.dateCreationEntreprise).getTime();
+            const dateB = new Date(b.dateCreationEntreprise).getTime();
+            if (isNaN(dateA)) return 1;
+            if (isNaN(dateB)) return -1;
+            return dateB - dateA; // newest first
+          })
+        );
+      }
+    } catch (e) { 
+      console.error("Fetch Error", e); 
+    } finally { 
+      setLoading(false); 
     }
   };
 
   useEffect(() => { fetchData(); }, []);
 
-  // --- FILTER LOGIC (UNCHANGED) ---
-  const filteredData = useMemo(() => {
-    const searchTerms = cleanStr(filters.searchQuery);
+  const handleAcceptEnterprise = async (id: string) => {
+    const ent = enterprises.find(e => e.entrepriseId === id);
+    if (!ent) return;
 
-    if (activeTab === 'TRANSACTIONS') {
-        const searchPayer = cleanStr(filters.payer);
-        const searchReceiver = cleanStr(filters.receiver);
-        const minAmt = filters.minAmount ? parseFloat(filters.minAmount) : null;
-        const maxAmt = filters.maxAmount ? parseFloat(filters.maxAmount) : null;
-        
-        let startTimestamp = 0;
-        let endTimestamp = Infinity;
-        if (filters.startDate) {
-            const d = new Date(filters.startDate);
-            d.setHours(0,0,0,0);
-            startTimestamp = d.getTime();
-        }
-        if (filters.endDate) {
-            const d = new Date(filters.endDate);
-            d.setHours(23,59,59,999);
-            endTimestamp = d.getTime();
-        }
+    setEnterprises(prev => prev.map(e => e.entrepriseId === id ? { ...e, isValidated: true } : e));
 
-        return transactions.filter(item => {
-            if (searchTerms) {
-                const match = cleanStr(item.clientName).includes(searchTerms) || cleanStr(item.txRef).includes(searchTerms) || cleanStr(item.product).includes(searchTerms) || cleanStr(item.paymentMethod).includes(searchTerms);
-                if (!match) return false;
-            }
-            if (searchPayer && !cleanStr(item.payerPhone).includes(searchPayer)) return false;
-            if (searchReceiver && !cleanStr(item.receiverPhone).includes(searchReceiver)) return false;
-            if (minAmt !== null && item.amount < minAmt) return false;
-            if (maxAmt !== null && item.amount > maxAmt) return false;
-            if (filters.txStatus !== 'ALL' && item.txStatus !== filters.txStatus) return false;
-            if (filters.paymentStatus !== 'ALL' && item.paymentStatus !== filters.paymentStatus) return false;
-            if (filters.startDate || filters.endDate) {
-                const itemTime = new Date(item.date).getTime();
-                if (itemTime < startTimestamp || itemTime > endTimestamp) return false;
-            }
-            return true;
-        });
-    } else {
-        return clients.filter(c => {
-            if (searchTerms) return cleanStr(c.name).includes(searchTerms) || cleanStr(c.phone).includes(searchTerms);
-            return true;
-        });
+    try {
+      console.log('[APPROVE ATTEMPT] Enterprise ID:', id);
+      console.log('[PAYLOAD BEING SENT]:', { ...ent.raw, status: "STATUS_APPROVED" });
+
+      await ApiService.enterprise.update(id, { ...ent.raw, status: "STATUS_APPROVED" });
+
+      console.log('[APPROVE SUCCESS]');
+    } catch (err) {
+      console.error('[APPROVE FAILED]', err);
+      alert("Error: Server rejected the update.");
+      setEnterprises(prev => prev.map(e => e.entrepriseId === id ? { ...e, isValidated: false } : e));
     }
-  }, [transactions, clients, filters, activeTab]);
-
-  const stats = useMemo(() => {
-    if (activeTab === 'TRANSACTIONS') {
-        const visibleTxs = filteredData as Transaction[];
-        return {
-            revenue: visibleTxs.filter(t => t.txStatus === 'SUCCESS').reduce((sum, t) => sum + t.amount, 0),
-            txCount: visibleTxs.length,
-            clientCount: clients.length 
-        };
-    } else {
-        const globalRevenue = transactions.filter(t => t.txStatus === 'SUCCESS').reduce((sum, t) => sum + t.amount, 0);
-        return {
-            revenue: globalRevenue,
-            txCount: transactions.length,
-            clientCount: (filteredData as Client[]).length 
-        };
-    }
-  }, [filteredData, transactions, clients, activeTab]);
-
-  const exportCSV = () => {
-    const isTx = activeTab === 'TRANSACTIONS';
-    const headers = isTx 
-        ? ["Date", "Ref", "Client", "Product", "Method", "Payer", "Receiver", "Amount", "Bonus", "Pay Status", "Tx Status"]
-        : ["Date", "Name", "Phone", "Email", "Balance", "Status"];
-    
-    const rows = filteredData.map((t: any) => isTx 
-        ? [new Date(t.date).toLocaleString(), `"${t.txRef}"`, `"${t.clientName}"`, t.product, t.paymentMethod, t.payerPhone, t.receiverPhone, t.amount, t.bonus, t.paymentStatus, t.txStatus]
-        : [new Date(t.date).toLocaleString(), `"${t.name}"`, t.phone, t.email, t.balance, t.status]
-    );
-
-    const csvContent = "data:text/csv;charset=utf-8,\uFEFF" + [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
-    const link = document.createElement("a");
-    link.href = encodeURI(csvContent);
-    link.download = `horebpay_${activeTab.toLowerCase()}.csv`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
   };
 
+  const onDenyClick = (id: string) => {
+    setDenyId(id);
+    setIsDenyModalOpen(true);
+  };
+
+  const confirmDenyEnterprise = async () => {
+    if (!denyId) return;
+    
+    setEnterprises(prev => prev.filter(e => e.entrepriseId !== denyId));
+    try {
+      await ApiService.enterprise.delete(denyId);
+    } catch(err) {
+      alert("Error: Could not delete.");
+      fetchData(); 
+    }
+  };
+
+  const openRecharge = (id: string = '', name: string = '') => { 
+    setRechargeId(id); 
+    setRechargeName(name);
+    setIsRechargeOpen(true); 
+  };
+  const openDeposit = (phone: string = '') => { 
+    setDepositClientPhone(phone); 
+    setIsDepositOpen(true); 
+  };
+
+  const filteredData = useMemo(() => {
+    const searchTerms = cleanStr(filters.searchQuery);
+    if (activeTab === 'TRANSACTIONS') {
+      const startTimestamp = filters.startDate ? new Date(filters.startDate).setHours(0,0,0,0) : 0;
+      const endTimestamp = filters.endDate ? new Date(filters.endDate).setHours(23,59,59,999) : Infinity;
+      return transactions.filter(item => {
+        if (searchTerms && !(cleanStr(item.clientName).includes(searchTerms) || cleanStr(item.txRef).includes(searchTerms))) return false;
+        if (filters.payer && !cleanStr(item.payerPhone).includes(cleanStr(filters.payer))) return false;
+        if (filters.receiver && !cleanStr(item.receiverPhone).includes(cleanStr(filters.receiver))) return false;
+        if (filters.minAmount && item.amount < Number(filters.minAmount)) return false;
+        if (filters.maxAmount && item.amount > Number(filters.maxAmount)) return false;
+        if (filters.txStatus !== 'ALL' && item.txStatus !== filters.txStatus) return false;
+        if (filters.paymentStatus !== 'ALL' && item.paymentStatus !== filters.paymentStatus) return false;
+        const tDate = new Date(item.date).getTime();
+        if (tDate < startTimestamp || tDate > endTimestamp) return false;
+        return true;
+      });
+    } else if (activeTab === 'CLIENTS') {
+      return clients.filter(c => !searchTerms || cleanStr(c.name).includes(searchTerms));
+    } else { // ENTERPRISES
+      return enterprises.filter(e => {
+        if (searchTerms && !cleanStr(e.nom).includes(searchTerms)) return false;
+
+        if (filters.enterpriseStartDate || filters.enterpriseEndDate) {
+          const entDate = new Date(e.dateCreationEntreprise).getTime();
+          if (filters.enterpriseStartDate) {
+            const startTs = new Date(filters.enterpriseStartDate).setHours(0, 0, 0, 0);
+            if (entDate < startTs) return false;
+          }
+          if (filters.enterpriseEndDate) {
+            const endTs = new Date(filters.enterpriseEndDate).setHours(23, 59, 59, 999);
+            if (entDate > endTs) return false;
+          }
+        }
+        return true;
+      });
+    }
+  }, [transactions, clients, enterprises, filters, activeTab]);
+
+  const stats = useMemo(() => {
+    if (activeTab === 'ENTERPRISES') {
+      const total = enterprises.length;
+      const active = enterprises.filter(e => e.isValidated).length;
+      return { total, active, pending: total - active };
+    }
+    return {
+      revenue: transactions.filter(t => t.txStatus === 'SUCCESS').reduce((sum, t) => sum + t.amount, 0),
+      txCount: transactions.length,
+      clientCount: clients.length
+    };
+  }, [transactions, clients, enterprises, activeTab]);
+
+  const exportCSV = () => { alert("Export feature available."); };
   const handlePrintList = () => { window.print(); };
-  const resetFilters = () => setFilters({ startDate: '', endDate: '', searchQuery: '', payer: '', receiver: '', minAmount: '', maxAmount: '', txStatus: 'ALL', paymentStatus: 'ALL' });
+
+  const resetFilters = () => setFilters({
+    startDate: '',
+    endDate: '',
+    searchQuery: '',
+    payer: '',
+    receiver: '',
+    minAmount: '',
+    maxAmount: '',
+    txStatus: 'ALL',
+    paymentStatus: 'ALL',
+    enterpriseStartDate: '',
+    enterpriseEndDate: '',
+  });
 
   return (
-    <div className="min-h-screen w-full font-sans text-slate-800 pb-20 p-4 md:p-6 lg:p-8">
+    <div className="min-h-screen w-full font-sans text-slate-800 pb-20 bg-white via-slate-50 to-white">
       
       {/* HEADER */}
-      <div className="flex flex-col xl:flex-row justify-between items-start xl:items-end gap-6 pb-2 border-b border-gray-200/60 mb-8 no-print">
-        <div>
-          <h1 className="text-2xl md:text-3xl font-extrabold text-[#1e3a8a] tracking-tight">HOREB PAY</h1><h1 className = "text-2xl md:text-3xl font-extrabold text-[#FFC107] tracking-tight">Dashboard</h1>
-          <p className="text-slate-500 mt-1 font-medium text-sm md:text-base">Real-time overview of HorebPay ecosystem.</p>
-        </div>
-
-        <div className="flex flex-col sm:flex-row gap-3 w-full xl:w-auto">
-           <div className="flex p-1 bg-slate-100 rounded-xl border border-slate-200 w-full sm:w-auto">
-                <button onClick={() => setActiveTab('TRANSACTIONS')} className={`flex-1 sm:flex-none px-4 py-2 text-sm font-bold rounded-lg transition-all ${activeTab === 'TRANSACTIONS' ? 'bg-white shadow text-[#1e3a8a]' : 'text-slate-500 hover:text-slate-700'}`}>Transactions</button>
-                <button onClick={() => setActiveTab('CLIENTS')} className={`flex-1 sm:flex-none px-4 py-2 text-sm font-bold rounded-lg transition-all ${activeTab === 'CLIENTS' ? 'bg-white shadow text-[#1e3a8a]' : 'text-slate-500 hover:text-slate-700'}`}>Clients</button>
-           </div>
-
-           <div className="grid grid-cols-4 sm:flex sm:gap-2 gap-2">
-                <button onClick={handlePrintList} className="flex items-center justify-center p-2 sm:px-4 sm:py-2 bg-[#1e3a8a] text-white rounded-xl  font-semibold text-sm"><Printer className="h-4 w-4"/> <span className="hidden sm:inline ml-2">List</span></button>
-                <button onClick={() => setIsPrivacyMode(!isPrivacyMode)} className={`flex items-center justify-center p-2 sm:px-3 rounded-xl border transition-all ${isPrivacyMode ? ' border-[#FFC107] text-[#FFC107]' : 'bg-white border-slate-200 text-slate-600'}`}>{isPrivacyMode ? <EyeOff className="h-4 w-4"/> : <Eye className="h-4 w-4"/>}</button>
-                <button onClick={fetchData} className="flex items-center justify-center p-2 sm:px-3 bg-white border rounded-xl text-slate-600"><RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} /></button>
-                <button onClick={exportCSV} className="flex items-center justify-center p-2 sm:px-4 bg-[#1e3a8a] text-white rounded-xl hover:bg-[#1e3a8a]/90"><Download className="h-4 w-4"/></button>
-                <button onClick={() => setIsLogoutOpen(true)} className="flex items-center justify-center p-2 sm:px-3  border border-[#FFC107] rounded-2xl text-[#FFC107]  col-span-4 sm:col-span-1 mt-2 sm:mt-0"><LogOut className="h-4 w-4"/></button>
-           </div>
-        </div>
-      </div>
-
-      {/* KPI CARDS */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8 no-print">
-        <div className="bg-gradient-to-br from-[#1e3a8a] to-[#172554] p-6 rounded-2xl shadow-xl shadow-blue-900/10 text-white relative overflow-hidden">
-            <div className="absolute right-0 top-0 p-6 opacity-10"><Banknote className="h-24 w-24" /></div>
-            <div className="relative z-10">
-                <p className="text-blue-200 text-xs font-bold uppercase tracking-wider mb-1">
-                    {activeTab === 'TRANSACTIONS' && (filters.searchQuery || filters.startDate || filters.txStatus !== 'ALL') ? 'Filtered Revenue' : 'Total Revenue'}
-                </p>
-                <h2 className="text-2xl md:text-3xl font-bold tracking-tight">{isPrivacyMode ? '••••••' : formatCurrency(stats.revenue)}</h2>
+      <div className="bg-white/80 backdrop-blur-xl border-b border-slate-200/60 sticky top-0 z-30 px-6 py-4 no-print shadow-sm">
+        <div className="max-w-[1600px] mx-auto flex flex-col xl:flex-row justify-between items-center gap-6">
+          <div className="flex items-center gap-3">
+            <div className="flex flex-col items-start">
+              <h1 className="text-3xl font-black text-[#1e3a8a] tracking-tight leading-none">
+                HOREB<span className="text-[#FFC107]">PAY</span>
+              </h1>
+              <p className="text-2xl font-black text-[#FFC107] tracking-wide mt-0.5">
+                Dashboard
+              </p>
             </div>
-        </div>
-        <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
-            <p className="text-slate-500 text-xs font-bold uppercase tracking-wider mb-1">{activeTab === 'TRANSACTIONS' ? 'Filtered Transactions' : 'Total Transactions'}</p>
-            <h3 className="text-2xl md:text-3xl font-bold text-slate-800">{stats.txCount.toLocaleString()}</h3>
-        </div>
-        <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
-            <p className="text-slate-500 text-xs font-bold uppercase tracking-wider mb-1">{activeTab === 'CLIENTS' ? 'Filtered Clients' : 'Total Users'}</p>
-            <h3 className="text-2xl md:text-3xl font-bold text-slate-800">{loading ? '...' : stats.clientCount.toLocaleString()}</h3>
-        </div>
-      </div>
+          </div>
 
-      {/* FILTERS */}
-      <div className="bg-white rounded-xl border border-slate-200 shadow-sm mb-6 no-print">
-        <div className="p-4 flex flex-col md:flex-row gap-4">
-            <div className="relative flex-1 w-full">
-                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-                 <input type="text" placeholder={activeTab === 'TRANSACTIONS' ? "Search Ref, Client, Method..." : "Search Client Name, Phone..."} className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:border-[#FFC107] focus:ring-1 focus:ring-[#FFC107]" value={filters.searchQuery} onChange={(e) => setFilters({...filters, searchQuery: e.target.value})} />
+          <div className="flex flex-col sm:flex-row gap-4 w-full xl:w-auto items-center">
+            <div className="flex p-1.5 bg-slate-100/50 rounded-2xl border border-slate-200/60">
+              <TabButton label="Transactions" active={activeTab === 'TRANSACTIONS'} onClick={() => setActiveTab('TRANSACTIONS')} />
+              <TabButton label="Clients" active={activeTab === 'CLIENTS'} onClick={() => setActiveTab('CLIENTS')} />
+              <TabButton label="Enterprises" active={activeTab === 'ENTERPRISES'} onClick={() => setActiveTab('ENTERPRISES')} />
             </div>
-            {activeTab === 'TRANSACTIONS' && (
-                <div className="flex gap-2">
-                    <button onClick={() => setShowFilters(!showFilters)} className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium border transition-colors ${showFilters ? 'bg-slate-100 border-slate-300' : 'bg-white border-slate-200'}`}><Filter className="h-4 w-4"/> Filters <ChevronDown className={`h-3 w-3 transition-transform ${showFilters ? 'rotate-180' : ''}`}/></button>
-                    <button onClick={resetFilters} className="px-4 py-2.5 text-sm text-[#1e3a8a] hover:bg-blue-50 rounded-xl">Reset</button>
-                </div>
-            )}
-        </div>
-
-        {activeTab === 'TRANSACTIONS' && (
-            <div className={`transition-all duration-300 overflow-hidden border-t border-slate-100 ${showFilters ? 'max-h-[800px] opacity-100 p-4' : 'max-h-0 opacity-0'}`}>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 bg-slate-50 p-4 rounded-xl">
-                    <div className="space-y-1"><label className="text-xs font-bold text-slate-500 uppercase">Tx Status</label><select className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm" value={filters.txStatus} onChange={(e) => setFilters({...filters, txStatus: e.target.value})}><option value="ALL">All</option><option value="SUCCESS">Success</option><option value="FAILED">Failed</option><option value="PENDING">Pending</option></select></div>
-                    <div className="space-y-1"><label className="text-xs font-bold text-slate-500 uppercase">Payment Status</label><select className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm" value={filters.paymentStatus} onChange={(e) => setFilters({...filters, paymentStatus: e.target.value})}><option value="ALL">All</option><option value="SUCCESS">Success</option><option value="FAILED">Failed</option><option value="PENDING">Pending</option></select></div>
-                    <div className="space-y-1 sm:col-span-2"><label className="text-xs font-bold text-slate-500 uppercase">Date Range</label><div className="flex gap-2"><input type="date" className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm" value={filters.startDate} onChange={(e) => setFilters({...filters, startDate: e.target.value})} /><span className="self-center text-slate-400">to</span><input type="date" className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm" value={filters.endDate} onChange={(e) => setFilters({...filters, endDate: e.target.value})} /></div></div>
-                    <div className="space-y-1"><label className="text-xs font-bold text-slate-500 uppercase">Payer Phone</label><input type="text" placeholder="e.g. 699..." className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm" value={filters.payer} onChange={(e) => setFilters({...filters, payer: e.target.value})} /></div>
-                    <div className="space-y-1"><label className="text-xs font-bold text-slate-500 uppercase">Receiver Phone</label><input type="text" placeholder="e.g. 677..." className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm" value={filters.receiver} onChange={(e) => setFilters({...filters, receiver: e.target.value})} /></div>
-                    <div className="col-span-full sm:col-span-2 pt-2 lg:pt-0 flex items-end"><div className="flex gap-2 items-center w-full"><span className="text-xs font-bold text-slate-500 uppercase w-12">Amt:</span><input type="number" placeholder="Min" className="w-full px-3 py-2 bg-white border rounded-lg text-sm" value={filters.minAmount} onChange={(e) => setFilters({...filters, minAmount: e.target.value})} /><span className="text-slate-400">-</span><input type="number" placeholder="Max" className="w-full px-3 py-2 bg-white border rounded-lg text-sm" value={filters.maxAmount} onChange={(e) => setFilters({...filters, maxAmount: e.target.value})} /></div></div>
-                </div>
-            </div>
-        )}
-      </div>
-
-      {/* TABLE */}
-      <div className="bg-white border border-slate-200 rounded-2xl shadow-xl shadow-slate-200/50 overflow-hidden print-area">
-        <div className="hidden print:block p-4 text-center border-b border-black">
-             <h1 className="text-xl font-bold uppercase">HorebPay {activeTab} Report</h1>
-             <p className="text-sm">Generated on: {new Date().toLocaleString()}</p>
-        </div>
-
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse min-w-[1000px] print:min-w-0">
-            <thead className="bg-slate-50 text-slate-600 text-xs font-bold uppercase sticky top-0">
-              <tr>
-                {activeTab === 'TRANSACTIONS' ? (
-                    <>
-                        <th className="px-6 py-4">Date & Time</th>
-                        <th className="px-6 py-4">Client</th>
-                        <th className="px-6 py-4">Product/Operator</th>
-                        <th className="px-6 py-4">Method</th>
-                        <th className="px-6 py-4">Flow (From - To)</th>
-                        <th className="px-6 py-4">Amount</th>
-                        <th className="px-6 py-4">Bonus</th>
-                        <th className="px-6 py-4 text-center">Status</th>
-                        <th className="px-6 py-4 text-center no-print">Print</th>
-                    </>
-                ) : (
-                    <>
-                        <th className="px-6 py-4">Date Joined</th>
-                        <th className="px-6 py-4">Client Name</th>
-                        <th className="px-6 py-4">Phone</th>
-                        <th className="px-6 py-4">Email</th>
-                        <th className="px-6 py-4">Balance</th>
-                        <th className="px-6 py-4 text-center">Status</th>
-                    </>
-                )}
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {loading ? (
-                <tr><td colSpan={9} className="py-20 text-center"><RefreshCw className="animate-spin h-8 w-8 text-[#1e3a8a] mx-auto mb-2"/>Loading data...</td></tr>
-              ) : filteredData.length === 0 ? (
-                <tr><td colSpan={9} className="py-20 text-center text-slate-400">No results found matching your filters.</td></tr>
-              ) : (
-                (filteredData as any[]).map((item) => {
-                    if (activeTab === 'TRANSACTIONS') {
-                        const t = item as Transaction;
-                        return (
-                            <tr key={t.id} className="hover:bg-blue-50/50 transition-colors">
-                                <td className="px-6 py-4 whitespace-nowrap">
-                                    <div className="font-bold text-slate-700 text-sm">{new Date(t.date).toLocaleDateString()}</div>
-                                    <div className="text-xs text-slate-500">{new Date(t.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</div>
-                                    <div className="text-[10px] text-slate-400 font-mono mt-1">{t.txRef}</div>
-                                </td>
-                                <td className="px-6 py-4 font-medium text-slate-800 text-sm max-w-[180px] truncate">{isPrivacyMode ? 'Client ***' : t.clientName}</td>
-                                <td className="px-6 py-4 whitespace-nowrap">
-                                    <div className="text-sm font-medium">{t.product}</div>
-                                    <div className="text-xs text-slate-400">{t.operator}</div>
-                                </td>
-                                
-                                <td className="px-6 py-4 whitespace-nowrap"><span className="text-xs font-bold text-slate-500 bg-slate-100 px-2 py-1 rounded">{t.paymentMethod}</span></td>
-
-                                <td className="px-6 py-4 text-xs whitespace-nowrap">
-                                    <div className="flex flex-col gap-1">
-                                        <div className="flex gap-2"><span className="text-slate-400 w-8">From:</span> <span className="font-mono">{isPrivacyMode ? '***' : t.payerPhone}</span></div>
-                                        <div className="flex gap-2"><span className="text-slate-400 w-8">To:</span> <span className="font-mono">{isPrivacyMode ? '***' : t.receiverPhone}</span></div>
-                                    </div>
-                                </td>
-                                <td className="px-6 py-4 font-bold text-[#1e3a8a] whitespace-nowrap">{isPrivacyMode ? '****' : formatCurrency(t.amount)}</td>
-                                
-                                {/* BONUS COLUMN WITH NEW FORMATTER */}
-                                <td className="px-6 py-4 font-bold text-[#1e3a8a] whitespace-nowrap">{isPrivacyMode ? '****' : formatBonus(t.bonus)}</td>
-
-                                <td className="px-6 py-4">
-                                    <div className="flex flex-col gap-1.5 items-center">
-                                        <StatusBadge type="PAY" status={t.paymentStatus} />
-                                        <StatusBadge type="TX" status={t.txStatus} />
-                                    </div>
-                                </td>
-                                <td className="px-6 py-4 text-center no-print">
-                                    <button onClick={() => setSelectedTx(t)} className="p-2 text-slate-400 hover:text-[#1e3a8a] hover:bg-slate-100 rounded-full" title="Print Receipt"><Printer className="h-4 w-4"/></button>
-                                </td>
-                            </tr>
-                        );
-                    } else {
-                        const c = item as Client;
-                        return (
-                            <tr key={c.id} className="hover:bg-amber-50/50 transition-colors">
-                                <td className="px-6 py-4 text-xs font-mono text-slate-500 whitespace-nowrap">{new Date(c.date).toLocaleDateString()}</td>
-                                <td className="px-6 py-4 font-bold text-slate-700 whitespace-nowrap">{isPrivacyMode ? c.name.slice(0,1)+'***' : c.name}</td>
-                                <td className="px-6 py-4 text-sm font-mono text-slate-600 whitespace-nowrap">{isPrivacyMode ? '***' : c.phone}</td>
-                                <td className="px-6 py-4 text-sm text-slate-500 whitespace-nowrap">{isPrivacyMode ? '***' : c.email}</td>
-                                <td className="px-6 py-4 font-bold text-slate-800 whitespace-nowrap">{formatCurrency(c.balance)}</td>
-                                <td className="px-6 py-4 text-center"><span className="px-2 py-1 bg-green-50 text-green-700 rounded text-xs font-bold">{c.status}</span></td>
-                            </tr>
-                        );
-                    }
-                })
+            
+            <div className="flex items-center gap-2">
+              {activeTab === 'ENTERPRISES' && (
+                <button
+                  onClick={() => openDeposit('')}
+                  className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-[#1e3a8a] to-blue-900 text-white font-semibold rounded-xl shadow-md shadow-blue-900/20 hover:shadow-lg hover:shadow-blue-900/30 hover:-translate-y-0.5 transition-all text-sm"
+                >
+                  <ArrowDownCircle className="h-4 w-4" />
+                  Deposit
+                </button>
               )}
-            </tbody>
-          </table>
+
+              <div className="h-8 w-[1px] bg-slate-200 mx-2 hidden sm:block"></div>
+              
+              <ActionIconBtn onClick={handlePrintList} icon={<Printer className="h-4 w-4"/>} title="Print" />
+              <ActionIconBtn onClick={() => setIsPrivacyMode(!isPrivacyMode)} icon={isPrivacyMode ? <EyeOff className="h-4 w-4"/> : <Eye className="h-4 w-4"/>} title="Privacy" active={isPrivacyMode} />
+              <ActionIconBtn onClick={fetchData} icon={<RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />} title="Refresh" />
+              
+              <button onClick={() => setIsLogoutOpen(true)} className="ml-2 p-2.5 bg-white border border-slate-200 text-slate-400 hover:text-red-600 hover:border-red-100 hover:bg-red-50 rounded-xl transition-all shadow-sm">
+                <LogOut className="h-4 w-4"/>
+              </button>
+            </div>
+          </div>
         </div>
       </div>
 
-      {selectedTx && <TransactionReceipt data={selectedTx} onClose={() => setSelectedTx(null)} />}
-      <LogoutModal isOpen={isLogoutOpen} onClose={() => setIsLogoutOpen(false)} onConfirm={logout} />
-    </div>
-  );
-}
+      <div className="max-w-[1600px] mx-auto p-4 md:p-8 space-y-8">
+        
+        {/* KPI STATS */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 no-print">
+          {activeTab === 'ENTERPRISES' ? (
+            <>
+              <KPICard title="Total Partners" value={(stats as any).total} />
+              <KPICard title="Validated" value={(stats as any).active} />
+              <KPICard title="Pending Review" value={(stats as any).pending} />
+            </>
+          ) : (
+            <>
+              <div className="bg-gradient-to-br from-[#1e3a8a] to-[#0f172a] p-8 rounded-[2rem] shadow-2xl shadow-blue-900/10 text-white relative overflow-hidden group hover:scale-[1.01] transition-transform duration-500">
+                <div className="absolute -right-6 -top-6 p-6 opacity-10 group-hover:scale-110 transition-transform duration-500"><Banknote className="h-32 w-32" /></div>
+                <div className="relative z-10">
+                  <p className="text-blue-200/80 text-[11px] font-bold uppercase tracking-widest mb-2 flex items-center gap-2"><Wallet className="h-3 w-3"/> Total Revenue</p>
+                  <h2 className="text-5xl font-black tracking-tighter font-mono">{isPrivacyMode ? '••••••' : formatCurrency((stats as any).revenue)}</h2>
+                </div>
+              </div>
+              <KPICard title="Volume" value={(stats as any).txCount}  color="gray" />
+              <KPICard title="Users" value={(stats as any).clientCount}  color="gray" />
+            </>
+          )}
+        </div>
 
-function StatusBadge({ type, status }: { type?: string, status: string }) {
-  let colors = "bg-slate-100 text-slate-600 border-slate-200";
-  let Icon = AlertCircle;
-  if (status === 'SUCCESS') { colors = "bg-emerald-50 text-emerald-700 border-emerald-200"; Icon = CheckCircle2; }
-  else if (status === 'FAILED') { colors = "bg-red-50 text-red-700 border-red-200"; Icon = XCircle; }
-  else if (status === 'PENDING') { colors = "bg-amber-50 text-amber-700 border-amber-200"; Icon = RefreshCw; }
-  
-  return (
-    <div className={`flex items-center justify-between w-24 px-2 py-0.5 rounded border text-[10px] font-bold ${colors}`}>
-         {type && <span className="opacity-50 text-[9px] mr-1">{type}</span>}
-         <div className="flex items-center gap-1">
-            <Icon className={`h-3 w-3 ${status==='PENDING'?'animate-spin':''}`} /> 
-            <span>{status.slice(0,4)}</span>
-         </div>
+        {/* FILTERS & SEARCH */}
+        <div className="bg-white rounded-[2rem] border border-slate-200/60 shadow-sm p-1.5 no-print transition-all hover:shadow-md duration-500">
+          <div className="p-2 flex flex-col md:flex-row gap-4 items-end">
+            <div className="relative flex-1">
+              <Search className="absolute left-5 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400" />
+              <input 
+                type="text" 
+                placeholder={activeTab === 'TRANSACTIONS' ? "Search by Reference, Client, Method..." : "Search by Name, Phone..."}
+                className="w-full pl-14 pr-4 py-4 bg-[#F8FAFB] border-transparent rounded-2xl text-sm font-semibold text-[#1e3a8a] placeholder-slate-400 outline-none focus:bg-white focus:ring-2 focus:ring-[#1e3a8a]/10 transition-all" 
+                value={filters.searchQuery} 
+                onChange={(e) => setFilters({...filters, searchQuery: e.target.value})} 
+              />
+            </div>
+
+            <div className="flex gap-2 items-center">
+              <button
+                onClick={() => setShowFilters(!showFilters)}
+                className={`flex items-center gap-2 px-6 py-3 rounded-2xl text-sm font-bold border transition-all active:scale-95 ${
+                  showFilters ? 'bg-slate-100 border-slate-300 text-slate-800' : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
+                }`}
+              >
+                <Filter className="h-4 w-4" /> Filters <ChevronDown className={`h-3 w-3 transition-transform duration-200 ${showFilters ? 'rotate-180' : ''}`} />
+              </button>
+              <button
+                onClick={resetFilters}
+                className="px-6 py-3 text-sm font-bold text-[#1e3a8a] bg-blue-50/50 hover:bg-blue-50 rounded-2xl transition-colors"
+              >
+                Reset
+              </button>
+            </div>
+          </div>
+
+          {showFilters && (
+            <div className="px-4 pb-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 animate-in slide-in-from-top-2 no-print border-t border-slate-100 mt-2 pt-6">
+              {activeTab === 'TRANSACTIONS' ? (
+                <>
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider pl-1">Tx Status</label>
+                    <div className="relative">
+                      <select
+                        className="w-full px-4 py-3 bg-[#F8FAFB] hover:bg-white border border-transparent hover:border-slate-200 rounded-2xl text-sm font-bold text-[#1e3a8a] appearance-none outline-none focus:ring-2 focus:ring-[#1e3a8a]/10 transition-all cursor-pointer"
+                        value={filters.txStatus}
+                        onChange={(val) => setFilters({...filters, txStatus: val.target.value})}
+                      >
+                        <option value="ALL">All Statuses</option>
+                        <option value="SUCCESS">Success</option>
+                        <option value="FAILED">Failed</option>
+                        <option value="PENDING">Pending</option>
+                      </select>
+                      <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 pointer-events-none"/>
+                    </div>
+                  </div>
+
+                  <div className="space-y-1 sm:col-span-2">
+                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider pl-1">Date Range</label>
+                    <div className="flex gap-2 items-center bg-[#F8FAFB] p-1 rounded-2xl border border-transparent hover:border-slate-200 transition-all">
+                      <input
+                        type="date"
+                        className="w-full bg-transparent text-sm font-bold text-[#1e3a8a] px-4 py-2 outline-none"
+                        value={filters.startDate}
+                        onChange={(e) => setFilters({...filters, startDate: e.target.value})}
+                      />
+                      <span className="text-slate-300">→</span>
+                      <input
+                        type="date"
+                        className="w-full bg-transparent text-sm font-bold text-[#1e3a8a] px-4 py-2 outline-none"
+                        value={filters.endDate}
+                        onChange={(e) => setFilters({...filters, endDate: e.target.value})}
+                      />
+                    </div>
+                  </div>
+                </>
+              ) : activeTab === 'ENTERPRISES' ? (
+                <>
+                  <div className="space-y-1 sm:col-span-2">
+                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider pl-1">Creation Date Range</label>
+                    <div className="flex gap-2 items-center bg-[#F8FAFB] p-1 rounded-2xl border border-transparent hover:border-slate-200 transition-all">
+                      <input
+                        type="date"
+                        className="w-full bg-transparent text-sm font-bold text-[#1e3a8a] px-4 py-2 outline-none"
+                        value={filters.enterpriseStartDate}
+                        onChange={(e) => setFilters({...filters, enterpriseStartDate: e.target.value})}
+                        placeholder="From"
+                      />
+                      <span className="text-slate-300">→</span>
+                      <input
+                        type="date"
+                        className="w-full bg-transparent text-sm font-bold text-[#1e3a8a] px-4 py-2 outline-none"
+                        value={filters.enterpriseEndDate}
+                        onChange={(e) => setFilters({...filters, enterpriseEndDate: e.target.value})}
+                        placeholder="To"
+                      />
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <div className="sm:col-span-2 text-xs text-slate-500 italic">
+                  Search active — no additional filters for Clients yet
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* TABLE CONTAINER */}
+        <div className="bg-white border border-slate-200 rounded-[2.5rem] shadow-xl shadow-slate-200/40 overflow-hidden print-area min-h-[500px]">
+          <div className="hidden print:block p-8 text-center border-b border-black">
+            <h1 className="text-3xl font-black uppercase text-black">HorebPay Report</h1>
+          </div>
+          <div className="overflow-x-auto custom-scrollbar">
+            <table className="w-full text-left border-collapse min-w-[1000px] print:min-w-0">
+              {activeTab === 'TRANSACTIONS' && <TransactionsTable data={filteredData as Transaction[]} isPrivacyMode={isPrivacyMode} onPrint={setSelectedTx} />}
+              {activeTab === 'CLIENTS' && <ClientsTable data={filteredData as Client[]} isPrivacyMode={isPrivacyMode} />}
+              {activeTab === 'ENTERPRISES' && (
+                <EnterprisesTable 
+                  data={filteredData as Enterprise[]} 
+                  onAccept={handleAcceptEnterprise} 
+                  onDeny={onDenyClick} 
+                  onRecharge={openRecharge}
+                />
+              )}
+            </table>
+          </div>
+        </div>
+
+        {/* Modals */}
+        {selectedTx && <TransactionReceipt data={selectedTx} onClose={() => setSelectedTx(null)} />}
+        <LogoutModal isOpen={isLogoutOpen} onClose={() => setIsLogoutOpen(false)} onConfirm={logout} />
+        <EnterpriseRechargeModal 
+          isOpen={isRechargeOpen} 
+          onClose={() => setIsRechargeOpen(false)} 
+          prefilledId={rechargeId} 
+          prefilledName={rechargeName}
+        />
+        <DepositModal isOpen={isDepositOpen} onClose={() => setIsDepositOpen(false)} prefilledPhone={depositClientPhone} />
+        <ConfirmationModal 
+          isOpen={isDenyModalOpen} 
+          onClose={() => setIsDenyModalOpen(false)} 
+          onConfirm={confirmDenyEnterprise}
+          title="Reject Enterprise?"
+          message="This action will permanently delete the enterprise application. This cannot be undone."
+          confirmText="Reject & Delete"
+        />
+      </div>
     </div>
   );
 }

@@ -5,15 +5,16 @@ export default defineConfig({
   plugins: [react()],
   server: {
     proxy: {
+      // 1. Login Route (Mapped to the new IP)
       '/api/auth/login': {
-        // Pointing to the URL that gave us a response in your curl test
-        target: 'https://prod.horebpay.com/horeb/api/users/login',
+        target: 'http://158.220.104.62:8089/horeb/api/users/login',
         changeOrigin: true,
         secure: false,
         rewrite: (path) => '', 
       },
+      // 2. Data Routes (Transactions, Clients, Enterprise)
       '/api': {
-        target: 'https://prod.horebpay.com/horeb/api',
+        target: 'http://158.220.104.62:8089/horeb/api',
         changeOrigin: true,
         secure: false,
         rewrite: (path) => path.replace(/^\/api/, ''),
