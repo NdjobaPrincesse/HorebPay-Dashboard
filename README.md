@@ -32,7 +32,7 @@ Cette commande télécharge toutes les librairies nécessaires (React, TypeScrip
 #### Étape 3 : Configurer les Variables d'Environnement
 Créez un fichier `.env.local` à la racine du projet :
 ```
-VITE_API_URL=https://prod.horebpay.com/horeb/api
+VITE_API_URL
 ```
 
 #### Étape 4 : Lancer le Serveur de Développement
@@ -90,7 +90,7 @@ Avant de déployer, ajoutez les variables d'environnement :
 1. Dans la page de configuration du projet, allez à **"Environment Variables"**
 2. Ajoutez les variables suivantes :
    - **Clé** : `VITE_API_URL`
-   - **Valeur** : `https://prod.horebpay.com/horeb/api`
+   - **Valeur** : `************`
 3. Cliquez sur **"Add"** puis **"Deploy"**
 
 #### Étape 5 : Déploiement Automatique
@@ -106,7 +106,7 @@ Créez un fichier `vercel.json` à la racine pour personnaliser :
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
   "env": {
-    "VITE_API_URL": "https://prod.horebpay.com/horeb/api"
+    "VITE_API_URL": "*******"
   }
 }
 ```
