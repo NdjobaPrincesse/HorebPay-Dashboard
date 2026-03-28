@@ -1,7 +1,14 @@
 {
   "compilerOptions": {
+    /* Module compatibility for Node and React imports */
     "esModuleInterop": true,
-    "allowSyntheticDefaultImports": true
+    "allowSyntheticDefaultImports": true,
+    "resolveJsonModule": true,
+    
+    /* Strictness checks (optional but recommended) */
+    "strict": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true
   },
   "files": [],
   "references": [
