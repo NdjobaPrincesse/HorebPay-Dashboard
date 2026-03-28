@@ -36,6 +36,7 @@ export interface Client {
 export interface Enterprise {
   entrepriseId: string;
   nom: string;
+  balance: number;
   rccm?: string;
   niu?: string;
   email?: string;

@@ -5,11 +5,12 @@ import { ApiService } from '../api/services';
 interface Props {
   isOpen: boolean;
   onClose: () => void;
+  onSuccess?: (payload: { entrepriseId: string; amount: number; responseData: any }) => void | Promise<void>;
   prefilledId?: string; 
   prefilledName?: string;
 }
 
-const EnterpriseRechargeModal = ({ isOpen, onClose, prefilledId = '', prefilledName = '' }: Props) => {
+const EnterpriseRechargeModal = ({ isOpen, onClose, onSuccess, prefilledId = '', prefilledName = '' }: Props) => {
   const [formData, setFormData] = useState({
     entrepriseId: prefilledId,
     entrepriseName: prefilledName,
@@ -34,10 +35,16 @@ const EnterpriseRechargeModal = ({ isOpen, onClose, prefilledId = '', prefilledN
     setStatus('IDLE');
 
     try {
-      await ApiService.enterprise.recharge({
+      const amount = Number(formData.montant);
+      const response = await ApiService.enterprise.recharge({
         entrepriseId: formData.entrepriseId,
-        montant: Number(formData.montant),
+        montant: amount,
         masterSecret: formData.masterSecret
+      });
+      await onSuccess?.({
+        entrepriseId: formData.entrepriseId,
+        amount,
+        responseData: response.data,
       });
       setStatus('SUCCESS');
       setTimeout(() => {

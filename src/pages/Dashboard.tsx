@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { 
   Users, Banknote, Download, Filter, Search, RefreshCw, 
   Eye, EyeOff, ChevronDown, CheckCircle2, ArrowRight, Wallet, Printer, LogOut, 
@@ -61,6 +61,90 @@ export default function Dashboard() {
     enterpriseStartDate: '',
     enterpriseEndDate: '',
   });
+
+  const getEnterpriseBalance = (enterprise: any) => {
+    const rawBalance = [
+      enterprise.balance,
+      enterprise.solde,
+      enterprise.currentBalance,
+      enterprise.nouveauSolde,
+      enterprise.newBalance,
+      enterprise.montantApres,
+      enterprise.walletBalance,
+      enterprise.wallet?.balance,
+      enterprise.compte?.solde,
+    ].find((value) => value !== undefined && value !== null && value !== '');
+
+    const parsedBalance = Number(rawBalance);
+    return Number.isFinite(parsedBalance) ? parsedBalance : 0;
+  };
+
+  const hasEnterpriseBalance = (enterprise: any) => {
+    return [
+      enterprise?.balance,
+      enterprise?.solde,
+      enterprise?.currentBalance,
+      enterprise?.nouveauSolde,
+      enterprise?.newBalance,
+      enterprise?.montantApres,
+      enterprise?.walletBalance,
+      enterprise?.wallet?.balance,
+      enterprise?.compte?.solde,
+    ].some((value) => value !== undefined && value !== null && value !== '');
+  };
+
+  const ENTERPRISE_BALANCE_STORAGE_KEY = 'enterpriseBalanceCache';
+
+  const getStoredEnterpriseBalances = (): Record<string, number> => {
+    try {
+      const raw = localStorage.getItem(ENTERPRISE_BALANCE_STORAGE_KEY);
+      return raw ? JSON.parse(raw) : {};
+    } catch {
+      return {};
+    }
+  };
+
+  const setStoredEnterpriseBalance = (entrepriseId: string, balance: number) => {
+    if (!entrepriseId || !Number.isFinite(balance)) return;
+
+    const balances = getStoredEnterpriseBalances();
+    balances[entrepriseId] = balance;
+    localStorage.setItem(ENTERPRISE_BALANCE_STORAGE_KEY, JSON.stringify(balances));
+  };
+
+  const getStoredEnterpriseBalance = (entrepriseId: string) => {
+    const balances = getStoredEnterpriseBalances();
+    const balance = balances[entrepriseId];
+    return Number.isFinite(balance) ? balance : undefined;
+  };
+
+  const handleEnterpriseRechargeSuccess = async ({
+    entrepriseId,
+    amount,
+    responseData,
+  }: {
+    entrepriseId: string;
+    amount: number;
+    responseData: any;
+  }) => {
+    const responseBalance = getEnterpriseBalance(responseData);
+    const responseHasBalance = hasEnterpriseBalance(responseData);
+
+    setEnterprises((prev) =>
+      prev.map((enterprise) => {
+        if (enterprise.entrepriseId !== entrepriseId) return enterprise;
+
+        const nextBalance = responseHasBalance
+          ? responseBalance
+          : enterprise.balance + amount;
+
+        setStoredEnterpriseBalance(entrepriseId, nextBalance);
+        return { ...enterprise, balance: nextBalance };
+      })
+    );
+
+    await fetchEnterprisesOnly(false);
+  };
 
   const fetchData = async () => {
     setLoading(true);
@@ -128,38 +212,60 @@ export default function Dashboard() {
         console.log('[RAW ENTERPRISES FROM API]', entData);
 
         setEnterprises(
-          entData.map((e: any): Enterprise => ({
-            entrepriseId: e.entrepriseId || e.id || '',
-            nom: e.nom || 'Unknown',
-            rccm: e.rccm || '',
-            niu: e.niu || '',
-            email: e.email || e.responsableEmail || '',
-            telephone: e.telephone || '',
-            lieu: e.lieu || '',
-            rue: e.rue || '',
-            boitePostale: e.boitePostale || '',
-            status: e.status || 'PENDING',
-            dateCreationEntreprise: e.dateCreationEntreprise 
-              || e.datecreationentreprises 
-              || new Date().toISOString(),
-            responsableNom: e.responsableNom 
-              || e.nomduresponsable 
-              || '-',
-            responsablePrenom: e.responsablePrenom || '',
-            responsableTelephone: e.responsableTelephone 
-              || e.numeroduresponsable 
-              || '-',
-            responsableEmail: e.responsableEmail || '',
-            isValidated: e.status === 'STATUS_APPROVED' || e.status === 'APPROVED',
-          }))
-          .sort((a: Enterprise, b: Enterprise) => {
-            const dateA = new Date(a.dateCreationEntreprise).getTime();
-            const dateB = new Date(b.dateCreationEntreprise).getTime();
-            if (isNaN(dateA)) return 1;
-            if (isNaN(dateB)) return -1;
-            return dateB - dateA; // newest first
-          })
-        );
+  entData.map((e: any): Enterprise => ({
+    entrepriseId: e.entrepriseId || e.id || '',
+    nom: e.nom || 'Unknown',
+    balance: hasEnterpriseBalance(e)
+      ? getEnterpriseBalance(e)
+      : getStoredEnterpriseBalance(e.entrepriseId || e.id || '') ?? 0,
+    rccm: e.rccm || '',
+    niu: e.niu || '',
+    email: e.email || e.responsableEmail || '',
+    telephone: e.telephone || '',
+    lieu: e.lieu || '',
+    rue: e.rue || '',
+    boitePostale: e.boitePostale || '',
+
+    // ✅ IMPORTANT: keep exact status
+    status: e.status || 'PENDING',
+
+    dateCreationEntreprise:
+      e.dateCreationEntreprise ||
+      e.datecreationentreprises ||
+      new Date().toISOString(),
+
+    // ✅ RESPONSABLE
+    responsableNom:
+      e.responsableNom ||
+      e.nomduresponsable ||
+      '-',
+
+    responsablePrenom: e.responsablePrenom || '',
+
+    responsableTelephone:
+      e.responsableTelephone ||
+      e.numeroduresponsable ||
+      '-',
+
+    responsableEmail: e.responsableEmail || '',
+
+    // ✅ FIX WRONG STATUS CHECK
+    isValidated:
+      e.status === 'STATUT_VALIDATED',
+
+    raw: e,
+
+  }))
+  .sort((a: Enterprise, b: Enterprise) => {
+    const dateA = new Date(a.dateCreationEntreprise).getTime();
+    const dateB = new Date(b.dateCreationEntreprise).getTime();
+
+    if (isNaN(dateA)) return 1;
+    if (isNaN(dateB)) return -1;
+
+    return dateB - dateA;
+  })
+);
       }
     } catch (e) { 
       console.error("Fetch Error", e); 
@@ -168,25 +274,231 @@ export default function Dashboard() {
     }
   };
 
-  useEffect(() => { fetchData(); }, []);
+  useEffect(() => { fetchTransactionsOnly(); }, []);
+
+  const fetchTransactionsOnly = async (showLoader = true) => {
+    if (showLoader) setLoading(true);
+    try {
+      const txRes = await ApiService.dashboard.getTransactions();
+      const rawData = txRes.data;
+      const txData = Array.isArray(rawData) ? rawData : (rawData.content || []);
+      setTransactions(
+        txData.map((t: any) => ({
+          id: t.transactionsId || t.id,
+          txRef: t.transactionsId || t.txRef || 'REF-N/A',
+          date: t.date || t.createdAt,
+          clientName: t.clientNom || 'Unknown',
+          clientId: t.clientId || '?',
+          operator: t.operateurNom || 'N/A',
+          product: t.produitLibelle || 'N/A',
+          paymentMethod: t.methodePaiementNom || '-',
+          payerPhone: t.numeroPayeur || 'N/A',
+          receiverPhone: t.numeroRecepteur || 'N/A',
+          amount: parseFloat(t.montant || 0),
+          bonus: parseFloat(t.bonus || 0),
+          paymentStatus: normalizeStatus(t.statusPaiement),
+          txStatus: normalizeStatus(t.statusTransaction || t.status)
+        }))
+        .sort((a: Transaction, b: Transaction) =>
+          new Date(b.date).getTime() - new Date(a.date).getTime()
+        )
+      );
+    } catch (e) {
+      console.error("Fetch Error", e);
+    } finally {
+      if (showLoader) setLoading(false);
+    }
+  };
+
+  const fetchClientsOnly = async (showLoader = true) => {
+    if (showLoader) setLoading(true);
+    try {
+      const clientsRes = await ApiService.dashboard.getClients();
+      const rawData = clientsRes.data;
+      const clientsData = Array.isArray(rawData) ? rawData : (rawData.content || []);
+      setClients(
+        clientsData.map((c: any) => ({
+          clientId: c.clientId || c.id,
+          nom: c.nom || '',
+          prenom: c.prenom || '',
+          phone: c.telephone || 'N/A',
+          email: c.email || 'N/A',
+          date: c.date || c.createdAt,
+          solde: parseFloat(c.solde || 0),
+          soldeBonus: parseFloat(c.soldeBonus || 0),
+          firstLogin: c.firstLogin ?? true,
+          name: [c.nom, c.prenom].filter(Boolean).join(' ').trim() || 'Unknown',
+          status: c.firstLogin ? 'First Login' : 'Active',
+        }))
+        .sort((a: Client, b: Client) =>
+          new Date(b.date).getTime() - new Date(a.date).getTime()
+        )
+      );
+    } catch (e) {
+      console.error("Fetch Error", e);
+    } finally {
+      if (showLoader) setLoading(false);
+    }
+  };
+
+  const fetchEnterprisesOnly = async (showLoader = true) => {
+    if (showLoader) setLoading(true);
+    try {
+      const entRes = await ApiService.enterprise.getAll();
+      const rawData = entRes.data;
+      const entData = Array.isArray(rawData) ? rawData : (rawData.content || []);
+
+      setEnterprises(
+        entData.map((e: any): Enterprise => ({
+          entrepriseId: e.entrepriseId || e.id || '',
+          nom: e.nom || 'Unknown',
+          balance: hasEnterpriseBalance(e)
+            ? getEnterpriseBalance(e)
+            : getStoredEnterpriseBalance(e.entrepriseId || e.id || '') ?? 0,
+          rccm: e.rccm || '',
+          niu: e.niu || '',
+          email: e.email || e.responsableEmail || '',
+          telephone: e.telephone || '',
+          lieu: e.lieu || '',
+          rue: e.rue || '',
+          boitePostale: e.boitePostale || '',
+          status: e.status || 'PENDING',
+          dateCreationEntreprise:
+            e.dateCreationEntreprise ||
+            e.datecreationentreprises ||
+            new Date().toISOString(),
+          responsableNom:
+            e.responsableNom ||
+            e.nomduresponsable ||
+            '-',
+          responsablePrenom: e.responsablePrenom || '',
+          responsableTelephone:
+            e.responsableTelephone ||
+            e.numeroduresponsable ||
+            '-',
+          responsableEmail: e.responsableEmail || '',
+          isValidated: e.status === 'STATUT_VALIDATED',
+          raw: e,
+        }))
+        .sort((a: Enterprise, b: Enterprise) => {
+          const dateA = new Date(a.dateCreationEntreprise).getTime();
+          const dateB = new Date(b.dateCreationEntreprise).getTime();
+          if (isNaN(dateA)) return 1;
+          if (isNaN(dateB)) return -1;
+          return dateB - dateA;
+        })
+      );
+    } catch (e) {
+      console.error("Fetch Error", e);
+    } finally {
+      if (showLoader) setLoading(false);
+    }
+  };
+
+  const refreshActiveTab = () => {
+    if (activeTab === 'TRANSACTIONS') {
+      fetchTransactionsOnly();
+      return;
+    }
+
+    if (activeTab === 'CLIENTS') {
+      fetchClientsOnly();
+      return;
+    }
+
+    fetchEnterprisesOnly();
+  };
+
+  useEffect(() => {
+    if (activeTab === 'CLIENTS' && clients.length === 0) {
+      fetchClientsOnly();
+      return;
+    }
+
+    if (activeTab === 'ENTERPRISES' && enterprises.length === 0) {
+      fetchEnterprisesOnly();
+    }
+  }, [activeTab]);
+
+  useEffect(() => {
+    enterprises.forEach((enterprise) => {
+      if (Number.isFinite(enterprise.balance)) {
+        setStoredEnterpriseBalance(enterprise.entrepriseId, enterprise.balance);
+      }
+    });
+  }, [enterprises]);
 
   const handleAcceptEnterprise = async (id: string) => {
     const ent = enterprises.find(e => e.entrepriseId === id);
     if (!ent) return;
 
-    setEnterprises(prev => prev.map(e => e.entrepriseId === id ? { ...e, isValidated: true } : e));
+    setEnterprises(prev => prev.map(e => (
+      e.entrepriseId === id
+        ? { ...e, isValidated: true, status: 'STATUT_VALIDATED' }
+        : e
+    )));
 
     try {
       console.log('[APPROVE ATTEMPT] Enterprise ID:', id);
-      console.log('[PAYLOAD BEING SENT]:', { ...ent.raw, status: "STATUS_APPROVED" });
+      console.log('[PAYLOAD BEING SENT]:', { ...ent.raw, status: 'STATUT_VALIDATED' });
 
-      await ApiService.enterprise.update(id, { ...ent.raw, status: "STATUS_APPROVED" });
+      await ApiService.enterprise.update(id, { ...ent.raw, status: 'STATUT_VALIDATED' });
 
       console.log('[APPROVE SUCCESS]');
     } catch (err) {
       console.error('[APPROVE FAILED]', err);
       alert("Error: Server rejected the update.");
-      setEnterprises(prev => prev.map(e => e.entrepriseId === id ? { ...e, isValidated: false } : e));
+      setEnterprises(prev => prev.map(e => (
+        e.entrepriseId === id
+          ? { ...e, isValidated: false, status: ent.status }
+          : e
+      )));
+    }
+  };
+
+  const handleSuspendEnterprise = async (id: string) => {
+    const ent = enterprises.find(e => e.entrepriseId === id);
+    if (!ent) return;
+
+    setEnterprises(prev => prev.map(e => (
+      e.entrepriseId === id
+        ? { ...e, isValidated: false, status: 'SUSPEND' }
+        : e
+    )));
+
+    try {
+      await ApiService.enterprise.update(id, { ...ent.raw, status: 'SUSPEND' });
+    } catch (err) {
+      console.error('[SUSPEND FAILED]', err);
+      alert('Error: Could not suspend enterprise.');
+      setEnterprises(prev => prev.map(e => (
+        e.entrepriseId === id
+          ? { ...e, isValidated: ent.isValidated, status: ent.status }
+          : e
+      )));
+    }
+  };
+
+  const handleUnsuspendEnterprise = async (id: string) => {
+    const ent = enterprises.find(e => e.entrepriseId === id);
+    if (!ent) return;
+
+    setEnterprises(prev => prev.map(e => (
+      e.entrepriseId === id
+        ? { ...e, isValidated: true, status: 'STATUT_VALIDATED' }
+        : e
+    )));
+
+    try {
+      await ApiService.enterprise.update(id, { ...ent.raw, status: 'STATUT_VALIDATED' });
+    } catch (err) {
+      console.error('[UNSUSPEND FAILED]', err);
+      alert('Error: Could not unsuspend enterprise.');
+      setEnterprises(prev => prev.map(e => (
+        e.entrepriseId === id
+          ? { ...e, isValidated: ent.isValidated, status: ent.status }
+          : e
+      )));
     }
   };
 
@@ -203,7 +515,7 @@ export default function Dashboard() {
       await ApiService.enterprise.delete(denyId);
     } catch(err) {
       alert("Error: Could not delete.");
-      fetchData(); 
+      fetchEnterprisesOnly(); 
     }
   };
 
@@ -290,14 +602,14 @@ export default function Dashboard() {
     <div className="min-h-screen w-full font-sans text-slate-800 pb-20 bg-white via-slate-50 to-white">
       
       {/* HEADER */}
-      <div className="bg-white/80 backdrop-blur-xl border-b border-slate-200/60 sticky top-0 z-30 px-6 py-4 no-print shadow-sm">
-        <div className="max-w-[1600px] mx-auto flex flex-col xl:flex-row justify-between items-center gap-6">
-          <div className="flex items-center gap-3">
+      <div className="bg-white/80 backdrop-blur-xl border-b border-slate-200/60 sticky top-0 z-30 px-4 py-4 sm:px-6 no-print shadow-sm">
+        <div className="max-w-[1600px] mx-auto flex flex-col xl:flex-row justify-between items-stretch xl:items-center gap-4 sm:gap-6">
+          <div className="flex items-center justify-center xl:justify-start gap-3">
             <div className="flex flex-col items-start">
-              <h1 className="text-3xl font-black text-[#1e3a8a] tracking-tight leading-none">
+              <h1 className="text-2xl sm:text-3xl font-black text-[#1e3a8a] tracking-tight leading-none">
                 HOREB<span className="text-[#FFC107]">PAY</span>
               </h1>
-              <p className="text-2xl font-black text-[#FFC107] tracking-wide mt-0.5">
+              <p className="text-xl sm:text-2xl font-black text-[#FFC107] tracking-wide mt-0.5">
                 Dashboard
               </p>
             </div>
@@ -321,11 +633,11 @@ export default function Dashboard() {
                 </button>
               )}
 
-              <div className="h-8 w-[1px] bg-slate-200 mx-2 hidden sm:block"></div>
+              <div className="h-8 w-\[1px\] bg-slate-200 mx-2 hidden sm:block"></div>
               
               <ActionIconBtn onClick={handlePrintList} icon={<Printer className="h-4 w-4"/>} title="Print" />
               <ActionIconBtn onClick={() => setIsPrivacyMode(!isPrivacyMode)} icon={isPrivacyMode ? <EyeOff className="h-4 w-4"/> : <Eye className="h-4 w-4"/>} title="Privacy" active={isPrivacyMode} />
-              <ActionIconBtn onClick={fetchData} icon={<RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />} title="Refresh" />
+              <ActionIconBtn onClick={refreshActiveTab} icon={<RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />} title="Refresh" />
               
               <button onClick={() => setIsLogoutOpen(true)} className="ml-2 p-2.5 bg-white border border-slate-200 text-slate-400 hover:text-red-600 hover:border-red-100 hover:bg-red-50 rounded-xl transition-all shadow-sm">
                 <LogOut className="h-4 w-4"/>
@@ -347,7 +659,7 @@ export default function Dashboard() {
             </>
           ) : (
             <>
-              <div className="bg-gradient-to-br from-[#1e3a8a] to-[#0f172a] p-8 rounded-[2rem] shadow-2xl shadow-blue-900/10 text-white relative overflow-hidden group hover:scale-[1.01] transition-transform duration-500">
+              <div className="bg-gradient-to-br from-[#1e3a8a] to-[#0f172a] p-6 sm:p-8 rounded-[2rem] shadow-2xl shadow-blue-900/10 text-white relative overflow-hidden group hover:scale-[1.01] transition-transform duration-500">
                 <div className="absolute -right-6 -top-6 p-6 opacity-10 group-hover:scale-110 transition-transform duration-500"><Banknote className="h-32 w-32" /></div>
                 <div className="relative z-10">
                   <p className="text-blue-200/80 text-[11px] font-bold uppercase tracking-widest mb-2 flex items-center gap-2"><Wallet className="h-3 w-3"/> Total Revenue</p>
@@ -362,7 +674,7 @@ export default function Dashboard() {
 
         {/* FILTERS & SEARCH */}
         <div className="bg-white rounded-[2rem] border border-slate-200/60 shadow-sm p-1.5 no-print transition-all hover:shadow-md duration-500">
-          <div className="p-2 flex flex-col md:flex-row gap-4 items-end">
+          <div className="p-2 flex flex-col md:flex-row gap-4 items-stretch md:items-end">
             <div className="relative flex-1">
               <Search className="absolute left-5 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400" />
               <input 
@@ -374,10 +686,10 @@ export default function Dashboard() {
               />
             </div>
 
-            <div className="flex gap-2 items-center">
+            <div className="flex flex-col sm:flex-row gap-2 items-stretch sm:items-center w-full md:w-auto">
               <button
                 onClick={() => setShowFilters(!showFilters)}
-                className={`flex items-center gap-2 px-6 py-3 rounded-2xl text-sm font-bold border transition-all active:scale-95 ${
+                className={`flex items-center justify-center gap-2 px-6 py-3 rounded-2xl text-sm font-bold border transition-all active:scale-95 w-full sm:w-auto ${
                   showFilters ? 'bg-slate-100 border-slate-300 text-slate-800' : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
                 }`}
               >
@@ -385,7 +697,7 @@ export default function Dashboard() {
               </button>
               <button
                 onClick={resetFilters}
-                className="px-6 py-3 text-sm font-bold text-[#1e3a8a] bg-blue-50/50 hover:bg-blue-50 rounded-2xl transition-colors"
+                className="px-6 py-3 text-sm font-bold text-[#1e3a8a] bg-blue-50/50 hover:bg-blue-50 rounded-2xl transition-colors w-full sm:w-auto"
               >
                 Reset
               </button>
@@ -415,7 +727,7 @@ export default function Dashboard() {
 
                   <div className="space-y-1 sm:col-span-2">
                     <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider pl-1">Date Range</label>
-                    <div className="flex gap-2 items-center bg-[#F8FAFB] p-1 rounded-2xl border border-transparent hover:border-slate-200 transition-all">
+                    <div className="flex flex-col sm:flex-row gap-2 items-stretch sm:items-center bg-[#F8FAFB] p-1 rounded-2xl border border-transparent hover:border-slate-200 transition-all">
                       <input
                         type="date"
                         className="w-full bg-transparent text-sm font-bold text-[#1e3a8a] px-4 py-2 outline-none"
@@ -436,7 +748,7 @@ export default function Dashboard() {
                 <>
                   <div className="space-y-1 sm:col-span-2">
                     <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider pl-1">Creation Date Range</label>
-                    <div className="flex gap-2 items-center bg-[#F8FAFB] p-1 rounded-2xl border border-transparent hover:border-slate-200 transition-all">
+                    <div className="flex flex-col sm:flex-row gap-2 items-stretch sm:items-center bg-[#F8FAFB] p-1 rounded-2xl border border-transparent hover:border-slate-200 transition-all">
                       <input
                         type="date"
                         className="w-full bg-transparent text-sm font-bold text-[#1e3a8a] px-4 py-2 outline-none"
@@ -465,12 +777,12 @@ export default function Dashboard() {
         </div>
 
         {/* TABLE CONTAINER */}
-        <div className="bg-white border border-slate-200 rounded-[2.5rem] shadow-xl shadow-slate-200/40 overflow-hidden print-area min-h-[500px]">
+        <div className="bg-white border border-slate-200 rounded-[1.75rem] sm:rounded-[2.5rem] shadow-xl shadow-slate-200/40 overflow-hidden print-area min-h-[500px]">
           <div className="hidden print:block p-8 text-center border-b border-black">
             <h1 className="text-3xl font-black uppercase text-black">HorebPay Report</h1>
           </div>
           <div className="overflow-x-auto custom-scrollbar">
-            <table className="w-full text-left border-collapse min-w-[1000px] print:min-w-0">
+            <table className="w-full text-left border-collapse min-w-[860px] lg:min-w-[1000px] print:min-w-0">
               {activeTab === 'TRANSACTIONS' && <TransactionsTable data={filteredData as Transaction[]} isPrivacyMode={isPrivacyMode} onPrint={setSelectedTx} />}
               {activeTab === 'CLIENTS' && <ClientsTable data={filteredData as Client[]} isPrivacyMode={isPrivacyMode} />}
               {activeTab === 'ENTERPRISES' && (
@@ -479,6 +791,8 @@ export default function Dashboard() {
                   onAccept={handleAcceptEnterprise} 
                   onDeny={onDenyClick} 
                   onRecharge={openRecharge}
+                  onSuspend={handleSuspendEnterprise}
+                  onUnsuspend={handleUnsuspendEnterprise}
                 />
               )}
             </table>
@@ -491,6 +805,7 @@ export default function Dashboard() {
         <EnterpriseRechargeModal 
           isOpen={isRechargeOpen} 
           onClose={() => setIsRechargeOpen(false)} 
+          onSuccess={handleEnterpriseRechargeSuccess}
           prefilledId={rechargeId} 
           prefilledName={rechargeName}
         />

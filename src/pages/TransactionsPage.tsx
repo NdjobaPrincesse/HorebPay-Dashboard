@@ -3,9 +3,10 @@ import { ArrowUpRight, ArrowDownLeft, CheckCircle2, XCircle, Banknote, Loader2, 
 import StatCard from '../components/StatCard';
 import TransactionDetailsModal from '../components/dashboard/TransactionDetailsModal'; 
 import type { Transaction } from '../types';
+import { normalizeStatus } from '../utils/formatters';
 
 const GLOBAL_TX_API = "/api/transactions"; 
-const isSuccess = (status: string) => status?.toUpperCase() !== 'FAILED';
+const isSuccess = (status: string) => status?.toUpperCase() === 'SUCCESS';
 
 export default function TransactionsPage() {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
@@ -27,16 +28,19 @@ export default function TransactionsPage() {
         id: t.transactionsId || Math.random().toString(), // Used for key
         amount: parseFloat(t.montant || 0), 
         date: t.date || new Date().toISOString(),
-        type: t.produitLibelle || 'TRANSACTION', 
-        status: t.statusPaiement || 'PENDING',
+        product: t.produitLibelle || 'TRANSACTION', 
         clientName: t.clientNom || 'Unknown',
+        clientId: t.clientId || '?',
         
         
         txRef: t.transactionsId || 'N/A',
         payerPhone: t.numeroPayeur || 'N/A',
         receiverPhone: t.numeroRecepteur || 'N/A',
-        method: t.methodePaiementNom || 'CASH',
+        paymentMethod: t.methodePaiementNom || 'CASH',
         operator: t.operateurNom || 'N/A',
+        bonus: parseFloat(t.bonus || 0),
+        paymentStatus: normalizeStatus(t.statusPaiement),
+        txStatus: normalizeStatus(t.statusTransaction || t.status),
         errorMessage: t.errorMessage
       })) : [];
 
@@ -48,8 +52,8 @@ export default function TransactionsPage() {
 
   useEffect(() => { fetchTransactions(); }, []);
 
-  const totalRevenue = transactions.filter(t => isSuccess(t.status)).reduce((sum, t) => sum + t.amount, 0);
-  const successCount = transactions.filter(t => isSuccess(t.status)).length;
+  const totalRevenue = transactions.filter(t => isSuccess(t.txStatus)).reduce((sum, t) => sum + t.amount, 0);
+  const successCount = transactions.filter(t => isSuccess(t.txStatus)).length;
   const failCount = transactions.length - successCount;
 
   const filtered = transactions.filter(t => 
@@ -102,7 +106,7 @@ export default function TransactionsPage() {
                 <div className="flex h-64 items-center justify-center text-gray-400 text-sm">No transactions found.</div>
             ) : (
                 filtered.map(tx => {
-                    const successful = isSuccess(tx.status);
+                    const successful = isSuccess(tx.txStatus);
                     return (
                         <div 
                             key={tx.id} 
@@ -121,7 +125,7 @@ export default function TransactionsPage() {
                                     <div className="flex items-center gap-2 mt-1">
                                         <span className="text-xs text-gray-400 font-mono">{new Date(tx.date).toLocaleDateString()}</span>
                                         <span className="text-[10px] px-1.5 py-0.5 bg-gray-100 text-gray-600 rounded border border-gray-200">
-                                            {tx.method?.replace('_', ' ')}
+                                            {tx.paymentMethod?.replace('_', ' ')}
                                         </span>
                                     </div>
                                 </div>
@@ -133,7 +137,7 @@ export default function TransactionsPage() {
                                 </p>
                                 <div className="flex items-center justify-end gap-2 mt-1">
                                     <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider ${successful ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
-                                        {tx.status}
+                                        {tx.txStatus}
                                     </span>
                                     <ArrowUpRight className="h-3 w-3 text-gray-300 opacity-0 group-hover:opacity-100 transition-opacity" />
                                 </div>

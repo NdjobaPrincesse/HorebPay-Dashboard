@@ -1,22 +1,23 @@
+// axios.ts
 import axios from 'axios';
 
-// Determine Environment
+// Base URL for API
+// Use environment variable or fallback to '/api'
 const baseURL = import.meta.env.VITE_API_URL || '/api';
 
+// Create Axios instance
 const api = axios.create({
-  baseURL: baseURL,
+  baseURL,
   headers: {
     'Content-Type': 'application/json',
   },
-  // CRITICAL: This allows the Server's Cookie to stick
-  withCredentials: true 
+  withCredentials: true, // Ensure cookies are sent with requests
 });
 
-// We don't need to manually attach a token anymore if using Cookies,
-// but we leave this here just in case you switch back to JWT later.
+// Optional: Attach token from localStorage if needed
 api.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem('token');
+    const token = localStorage.getItem('token'); // your JWT token
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
@@ -25,14 +26,15 @@ api.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
+// Global response interceptor for handling errors
 api.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
-       console.warn("Session Expired or Invalid");
-       // Optional: Auto-logout if cookie dies
-       // localStorage.removeItem('userId');
-       // window.location.href = '/login';
+      console.warn('Session expired or unauthorized');
+      // Optional: Auto-logout if session expired
+      // localStorage.removeItem('token');
+      // window.location.href = '/login';
     }
     return Promise.reject(error);
   }

@@ -1,37 +1,51 @@
-import api from './axios';
+import api  from './axios';
 import { APP_CONFIG } from '../config';
 
+// Helper to get client initiator
 const getInitiator = () => {
-  return localStorage.getItem('clientInitiator') || localStorage.getItem('userId') || APP_CONFIG.CLIENT_INITIATOR;
+  return (
+    localStorage.getItem('clientInitiator') ||
+    localStorage.getItem('userId') ||
+    APP_CONFIG.CLIENT_INITIATOR
+  );
 };
 
 export const ApiService = {
-  auth: { login: (p: any) => api.post('/auth/login', p) },
-  dashboard: { getTransactions: () => api.get('/transactions'), getClients: () => api.get('/clients') },
+  auth: {
+    login: (payload: any) => api.post('/auth/login', payload),
+  },
+
+  dashboard: {
+    getTransactions: () => api.get('/transactions'),
+    getClients: () => api.get('/clients'),
+  },
 
   enterprise: {
-    getAll: () => api.get('/entreprise'), 
+    getAll: () => api.get('/entreprise'),
 
-   
     recharge: (data: { entrepriseId: string; montant: number; masterSecret: string }) => {
-      
       const payload = {
-        clientInitiatorId: getInitiator(), 
+        clientInitiatorId: getInitiator(),
         entrepriseId: data.entrepriseId,
         masterSecret: data.masterSecret,
-        montant: data.montant
+        montant: data.montant,
       };
-
-      console.log("Sending Recharge Payload (Fixed):", payload);
+      console.log('Recharge Payload:', payload);
       return api.post('/transactions/wallet/entreprise/recharge', payload);
     },
 
-    update: (id: string, payload: any) => api.put(`/entreprise/${id}`, payload),
-    delete: (id: string) => api.delete(`/entreprise/${id}`)
+    update: (id: string, payload: any) => {
+      // Ensure clientInitiatorId is always sent
+      const fullPayload = { ...payload, clientInitiatorId: getInitiator() };
+      console.log(`Updating enterprise ${id} with payload:`, fullPayload);
+      return api.put(`/entreprise/${id}`, fullPayload);
+    },
+
+    delete: (id: string) => api.delete(`/entreprise/${id}`),
   },
 
   transactions: {
     getConfig: () => api.get('/money-transfer-config'),
-    deposit: (p: any) => api.post('/transactions/deposit', p)
-  }
+    deposit: (payload: any) => api.post('/transactions/deposit', payload),
+  },
 };
