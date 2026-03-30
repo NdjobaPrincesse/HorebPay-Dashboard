@@ -581,6 +581,21 @@ export default function Dashboard() {
     };
   }, [transactions, clients, enterprises, activeTab]);
 
+  const revenueDisplay = useMemo(() => {
+    const formattedRevenue = formatCurrency((stats as any).revenue ?? 0).trim();
+    const match = formattedRevenue.match(/^(.*?)(?:\s+(F\s*CFA|FCFA|XOF))$/i);
+
+    return {
+      amount: match?.[1] ?? formattedRevenue,
+      currency: match?.[2] ?? 'FCFA',
+    };
+  }, [stats]);
+
+  const revenueAmountGroups = useMemo(
+    () => revenueDisplay.amount.split(/[\s\u202F]+/).filter(Boolean),
+    [revenueDisplay.amount]
+  );
+
   const exportCSV = () => { alert("Export feature available."); };
   const handlePrintList = () => { window.print(); };
 
@@ -659,11 +674,26 @@ export default function Dashboard() {
             </>
           ) : (
             <>
-              <div className="bg-gradient-to-br from-[#1e3a8a] to-[#0f172a] p-6 sm:p-8 rounded-[2rem] shadow-2xl shadow-blue-900/10 text-white relative overflow-hidden group hover:scale-[1.01] transition-transform duration-500">
-                <div className="absolute -right-6 -top-6 p-6 opacity-10 group-hover:scale-110 transition-transform duration-500"><Banknote className="h-32 w-32" /></div>
-                <div className="relative z-10">
+              <div className="bg-linear-to-br from-[#1e3a8a] to-[#0f172a] p-5 sm:p-6 rounded-[1.75rem] shadow-2xl shadow-blue-900/10 text-white relative overflow-hidden group hover:scale-[1.01] transition-transform duration-500 min-w-0">
+                <div className="absolute -right-4 -top-4 p-5 opacity-10 group-hover:scale-110 transition-transform duration-500"><Banknote className="h-24 w-24 sm:h-28 sm:w-28" /></div>
+                <div className="relative z-10 min-w-0">
                   <p className="text-blue-200/80 text-[11px] font-bold uppercase tracking-widest mb-2 flex items-center gap-2"><Wallet className="h-3 w-3"/> Total Revenue</p>
-                  <h2 className="text-5xl font-black tracking-tighter font-mono">{isPrivacyMode ? '••••••' : formatCurrency((stats as any).revenue)}</h2>
+                  <h2 className="max-w-full font-mono font-black tracking-tight leading-none text-[clamp(1.75rem,5vw,3rem)]">
+                    {isPrivacyMode ? (
+                      '••••••'
+                    ) : (
+                      <span className="flex max-w-full flex-wrap items-end gap-x-2 gap-y-1">
+                        <span className="flex min-w-0 max-w-full flex-wrap items-end gap-x-2 gap-y-1 overflow-wrap-anywhere">
+                          {revenueAmountGroups.map((group, index) => (
+                            <span key={`${group}-${index}`}>{group}</span>
+                          ))}
+                        </span>
+                        <span className="text-[0.48em] font-bold uppercase tracking-[0.2em] text-blue-100/90">
+                          {revenueDisplay.currency}
+                        </span>
+                      </span>
+                    )}
+                  </h2>
                 </div>
               </div>
               <KPICard title="Volume" value={(stats as any).txCount}  color="gray" />

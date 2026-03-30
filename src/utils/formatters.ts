@@ -7,13 +7,16 @@
  * Main balance: integer display (0 decimals)
  */
 export const formatCurrency = (val: number): string => {
-  if (isNaN(val)) return '0 F CFA';
+  if (isNaN(val)) return '0 FCFA';
   return new Intl.NumberFormat('fr-FR', {
     style: 'currency',
     currency: 'XOF',
     minimumFractionDigits: 0,
     maximumFractionDigits: 0,
-  }).format(val);
+  })
+    .format(val)
+    .replace(/(\d)\s(?=\d{3}\b)/g, '$1\u202F')
+    .replace(/\bF\s*CFA\b/g, 'FCFA');
 };
 
 /**
@@ -26,13 +29,16 @@ export const formatCurrency = (val: number): string => {
  * Bonus: always 3 decimal places (big decimal style)
  */
 export const formatBonus = (val: number): string => {
-  if (isNaN(val)) return '0,000 F CFA';
+  if (isNaN(val)) return '0,000 FCFA';
   return new Intl.NumberFormat('fr-FR', {
     style: 'currency',
     currency: 'XOF',
     minimumFractionDigits: 3,
     maximumFractionDigits: 3,
-  }).format(val);
+  })
+    .format(val)
+    .replace(/(\d)\s(?=\d{3}\b)/g, '$1\u202F')
+    .replace(/\bF\s*CFA\b/g, 'FCFA');
 };
 
 /**
