@@ -10,6 +10,7 @@ export interface Transaction {
   payerPhone: string;
   receiverPhone: string;
   amount: number;
+  serviceFee: number;
   bonus: number; 
   paymentStatus: string; 
   txStatus: string;

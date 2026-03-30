@@ -38,6 +38,7 @@ export default function TransactionsPage() {
         receiverPhone: t.numeroRecepteur || 'N/A',
         paymentMethod: t.methodePaiementNom || 'CASH',
         operator: t.operateurNom || 'N/A',
+        serviceFee: parseFloat(t.fraisService ?? t.serviceFee ?? t.frais ?? 0),
         bonus: parseFloat(t.bonus || 0),
         paymentStatus: normalizeStatus(t.statusPaiement),
         txStatus: normalizeStatus(t.statusTransaction || t.status),

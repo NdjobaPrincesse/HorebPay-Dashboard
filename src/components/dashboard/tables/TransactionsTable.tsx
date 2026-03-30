@@ -1,5 +1,5 @@
 import React from 'react';
-import { Printer } from 'lucide-react';
+import { BadgeDollarSign, Gift, Printer, Wallet } from 'lucide-react';
 import type { Transaction } from '../../../types';
 import { formatCurrency, formatBonus } from '../../../utils/formatters';
 import { StatusBadge } from '../ui/StatusBadge';
@@ -20,8 +20,24 @@ export const TransactionsTable = ({ data, isPrivacyMode, onPrint }: Props) => {
             <th className="px-6 py-5 tracking-wider">Service</th>
             <th className="px-6 py-5 tracking-wider">Method</th>
             <th className="px-6 py-5 tracking-wider">Flow</th>
-            <th className="px-6 py-5 tracking-wider">Amount</th>
-            <th className="px-6 py-5 tracking-wider">Bonus</th>
+            <th className="px-6 py-5 tracking-wider">
+              <span className="inline-flex items-center gap-2 whitespace-nowrap">
+                <Wallet className="h-3.5 w-3.5" />
+                Amount
+              </span>
+            </th>
+            <th className="px-6 py-5 tracking-wider">
+              <span className="inline-flex items-center gap-2 whitespace-nowrap">
+                <BadgeDollarSign className="h-3.5 w-3.5" />
+                Service Fees
+              </span>
+            </th>
+            <th className="px-6 py-5 tracking-wider">
+              <span className="inline-flex items-center gap-2 whitespace-nowrap">
+                <Gift className="h-3.5 w-3.5" />
+                Bonus
+              </span>
+            </th>
             <th className="px-6 py-5 tracking-wider text-center">Status</th>
             <th className="px-8 py-5 tracking-wider text-right no-print">Action</th>
         </tr>
@@ -52,6 +68,7 @@ export const TransactionsTable = ({ data, isPrivacyMode, onPrint }: Props) => {
                     </div>
                 </td>
                 <td className="px-6 py-5 font-mono font-bold text-[#1e3a8a] text-base whitespace-nowrap">{isPrivacyMode ? '****' : formatCurrency(t.amount)}</td>
+                <td className="px-6 py-5 font-mono font-bold text-amber-600 text-sm whitespace-nowrap">{isPrivacyMode ? '****' : formatCurrency(t.serviceFee)}</td>
                 <td className="px-6 py-5 font-mono font-bold text-green-600 text-sm whitespace-nowrap">{isPrivacyMode ? '****' : formatBonus(t.bonus)}</td>
                 <td className="px-6 py-5">
                     <div className="flex flex-col gap-1.5 items-center">

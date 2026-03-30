@@ -172,6 +172,7 @@ export default function Dashboard() {
             payerPhone: t.numeroPayeur || 'N/A',
             receiverPhone: t.numeroRecepteur || 'N/A',
             amount: parseFloat(t.montant || 0),
+            serviceFee: parseFloat(t.fraisService ?? t.serviceFee ?? t.frais ?? 0),
             bonus: parseFloat(t.bonus || 0), 
             paymentStatus: normalizeStatus(t.statusPaiement),
             txStatus: normalizeStatus(t.statusTransaction || t.status)
@@ -295,6 +296,7 @@ export default function Dashboard() {
           payerPhone: t.numeroPayeur || 'N/A',
           receiverPhone: t.numeroRecepteur || 'N/A',
           amount: parseFloat(t.montant || 0),
+          serviceFee: parseFloat(t.fraisService ?? t.serviceFee ?? t.frais ?? 0),
           bonus: parseFloat(t.bonus || 0),
           paymentStatus: normalizeStatus(t.statusPaiement),
           txStatus: normalizeStatus(t.statusTransaction || t.status)
