@@ -182,9 +182,9 @@ export const EnterprisesTable = ({
 
               {/* ✅ BALANCE */}
               <td className="px-5 py-4">
-                <div className={`flex items-center gap-2 font-semibold ${e.balance > 0 ? 'text-green-600' : 'text-red-500'}`}>
+                <div className={`flex items-center gap-2 font-semibold ${e.solde > 0 ? 'text-green-600' : 'text-red-500'}`}>
                   <Wallet className="h-4 w-4" />
-                  {formatCurrency(e.balance)}
+                  {formatCurrency(e.solde)}
                 </div>
               </td>
 

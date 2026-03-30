@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { 
   Users, Banknote, Download, Filter, Search, RefreshCw, 
   Eye, EyeOff, ChevronDown, CheckCircle2, ArrowRight, Wallet, Printer, LogOut, 
-  Building2, Zap, Clock, ShieldCheck, ArrowDownCircle
+  Building2, Zap, Clock, ShieldCheck, ArrowDownCircle, PauseCircle, PlayCircle
 } from 'lucide-react';
 import { ApiService } from '../api/services';
 import { logout } from '../api/auth';
@@ -21,6 +21,8 @@ import { ActionIconBtn } from '../components/dashboard/ui/ActionIconBtn';
 import { TransactionsTable } from '../components/dashboard/tables/TransactionsTable';
 import { ClientsTable } from '../components/dashboard/tables/ClientsTable';
 import { EnterprisesTable } from '../components/dashboard/tables/EnterprisesTable';
+
+type EnterpriseActionType = 'approve' | 'suspend' | 'unsuspend';
 
 export default function Dashboard() {
   const [activeTab, setActiveTab] = useState<'TRANSACTIONS' | 'CLIENTS' | 'ENTERPRISES'>('TRANSACTIONS');
@@ -47,6 +49,13 @@ export default function Dashboard() {
 
   const [isDenyModalOpen, setIsDenyModalOpen] = useState(false);
   const [denyId, setDenyId] = useState('');
+  const [isEnterpriseActionModalOpen, setIsEnterpriseActionModalOpen] = useState(false);
+  const [pendingEnterpriseAction, setPendingEnterpriseAction] = useState<{
+    id: string;
+    action: EnterpriseActionType;
+    name: string;
+  } | null>(null);
+  const [isEnterpriseActionSubmitting, setIsEnterpriseActionSubmitting] = useState(false);
 
   const [filters, setFilters] = useState({
     startDate: '',
@@ -63,64 +72,12 @@ export default function Dashboard() {
   });
 
   const getEnterpriseBalance = (enterprise: any) => {
-    const rawBalance = [
-      enterprise.balance,
-      enterprise.solde,
-      enterprise.currentBalance,
-      enterprise.nouveauSolde,
-      enterprise.newBalance,
-      enterprise.montantApres,
-      enterprise.walletBalance,
-      enterprise.wallet?.balance,
-      enterprise.compte?.solde,
-    ].find((value) => value !== undefined && value !== null && value !== '');
-
-    const parsedBalance = Number(rawBalance);
+    const parsedBalance = Number(enterprise?.solde);
     return Number.isFinite(parsedBalance) ? parsedBalance : 0;
-  };
-
-  const hasEnterpriseBalance = (enterprise: any) => {
-    return [
-      enterprise?.balance,
-      enterprise?.solde,
-      enterprise?.currentBalance,
-      enterprise?.nouveauSolde,
-      enterprise?.newBalance,
-      enterprise?.montantApres,
-      enterprise?.walletBalance,
-      enterprise?.wallet?.balance,
-      enterprise?.compte?.solde,
-    ].some((value) => value !== undefined && value !== null && value !== '');
-  };
-
-  const ENTERPRISE_BALANCE_STORAGE_KEY = 'enterpriseBalanceCache';
-
-  const getStoredEnterpriseBalances = (): Record<string, number> => {
-    try {
-      const raw = localStorage.getItem(ENTERPRISE_BALANCE_STORAGE_KEY);
-      return raw ? JSON.parse(raw) : {};
-    } catch {
-      return {};
-    }
-  };
-
-  const setStoredEnterpriseBalance = (entrepriseId: string, balance: number) => {
-    if (!entrepriseId || !Number.isFinite(balance)) return;
-
-    const balances = getStoredEnterpriseBalances();
-    balances[entrepriseId] = balance;
-    localStorage.setItem(ENTERPRISE_BALANCE_STORAGE_KEY, JSON.stringify(balances));
-  };
-
-  const getStoredEnterpriseBalance = (entrepriseId: string) => {
-    const balances = getStoredEnterpriseBalances();
-    const balance = balances[entrepriseId];
-    return Number.isFinite(balance) ? balance : undefined;
   };
 
   const handleEnterpriseRechargeSuccess = async ({
     entrepriseId,
-    amount,
     responseData,
   }: {
     entrepriseId: string;
@@ -128,20 +85,16 @@ export default function Dashboard() {
     responseData: any;
   }) => {
     const responseBalance = getEnterpriseBalance(responseData);
-    const responseHasBalance = hasEnterpriseBalance(responseData);
 
-    setEnterprises((prev) =>
-      prev.map((enterprise) => {
-        if (enterprise.entrepriseId !== entrepriseId) return enterprise;
-
-        const nextBalance = responseHasBalance
-          ? responseBalance
-          : enterprise.balance + amount;
-
-        setStoredEnterpriseBalance(entrepriseId, nextBalance);
-        return { ...enterprise, balance: nextBalance };
-      })
-    );
+    if (responseData?.solde !== undefined && responseData?.solde !== null && responseData?.solde !== '') {
+      setEnterprises((prev) =>
+        prev.map((enterprise) =>
+          enterprise.entrepriseId === entrepriseId
+            ? { ...enterprise, solde: responseBalance }
+            : enterprise
+        )
+      );
+    }
 
     await fetchEnterprisesOnly(false);
   };
@@ -212,13 +165,11 @@ export default function Dashboard() {
 
         console.log('[RAW ENTERPRISES FROM API]', entData);
 
-        setEnterprises(
+    setEnterprises(
   entData.map((e: any): Enterprise => ({
     entrepriseId: e.entrepriseId || e.id || '',
     nom: e.nom || 'Unknown',
-    balance: hasEnterpriseBalance(e)
-      ? getEnterpriseBalance(e)
-      : getStoredEnterpriseBalance(e.entrepriseId || e.id || '') ?? 0,
+    solde: getEnterpriseBalance(e),
     rccm: e.rccm || '',
     niu: e.niu || '',
     email: e.email || e.responsableEmail || '',
@@ -354,9 +305,7 @@ export default function Dashboard() {
         entData.map((e: any): Enterprise => ({
           entrepriseId: e.entrepriseId || e.id || '',
           nom: e.nom || 'Unknown',
-          balance: hasEnterpriseBalance(e)
-            ? getEnterpriseBalance(e)
-            : getStoredEnterpriseBalance(e.entrepriseId || e.id || '') ?? 0,
+          solde: getEnterpriseBalance(e),
           rccm: e.rccm || '',
           niu: e.niu || '',
           email: e.email || e.responsableEmail || '',
@@ -421,14 +370,6 @@ export default function Dashboard() {
       fetchEnterprisesOnly();
     }
   }, [activeTab]);
-
-  useEffect(() => {
-    enterprises.forEach((enterprise) => {
-      if (Number.isFinite(enterprise.balance)) {
-        setStoredEnterpriseBalance(enterprise.entrepriseId, enterprise.balance);
-      }
-    });
-  }, [enterprises]);
 
   const handleAcceptEnterprise = async (id: string) => {
     const ent = enterprises.find(e => e.entrepriseId === id);
@@ -509,12 +450,88 @@ export default function Dashboard() {
     setIsDenyModalOpen(true);
   };
 
+  const openEnterpriseActionModal = (action: EnterpriseActionType, id: string) => {
+    const enterprise = enterprises.find((item) => item.entrepriseId === id);
+    if (!enterprise) return;
+
+    setPendingEnterpriseAction({
+      id,
+      action,
+      name: enterprise.nom || 'this enterprise',
+    });
+    setIsEnterpriseActionModalOpen(true);
+  };
+
+  const closeEnterpriseActionModal = () => {
+    if (isEnterpriseActionSubmitting) return;
+    setIsEnterpriseActionModalOpen(false);
+    setPendingEnterpriseAction(null);
+  };
+
+  const confirmEnterpriseAction = async () => {
+    if (!pendingEnterpriseAction) return;
+
+    setIsEnterpriseActionSubmitting(true);
+
+    try {
+      if (pendingEnterpriseAction.action === 'approve') {
+        await handleAcceptEnterprise(pendingEnterpriseAction.id);
+      } else if (pendingEnterpriseAction.action === 'suspend') {
+        await handleSuspendEnterprise(pendingEnterpriseAction.id);
+      } else {
+        await handleUnsuspendEnterprise(pendingEnterpriseAction.id);
+      }
+
+      setIsEnterpriseActionModalOpen(false);
+      setPendingEnterpriseAction(null);
+    } finally {
+      setIsEnterpriseActionSubmitting(false);
+    }
+  };
+
+  const enterpriseActionModalConfig = useMemo(() => {
+    if (!pendingEnterpriseAction) return null;
+
+    if (pendingEnterpriseAction.action === 'approve') {
+      return {
+        title: 'Do You Really Want to Approve This Enterprise?',
+        message: `${pendingEnterpriseAction.name} will be approved and activated immediately.`,
+        confirmText: 'Yes',
+        cancelText: 'No',
+        tone: 'primary' as const,
+        icon: <CheckCircle2 className="h-5 w-5" />,
+      };
+    }
+
+    if (pendingEnterpriseAction.action === 'suspend') {
+      return {
+        title: 'Do You Really Want to Suspend This Enterprise?',
+        message: `${pendingEnterpriseAction.name} will be suspended until you enable it again.`,
+        confirmText: 'Yes',
+        cancelText: 'No',
+        tone: 'warning' as const,
+        icon: <PauseCircle className="h-5 w-5" />,
+      };
+    }
+
+    return {
+      title: 'Do You Really Want to Unsuspend This Enterprise?',
+      message: `${pendingEnterpriseAction.name} will be reactivated immediately.`,
+      confirmText: 'Yes',
+      cancelText: 'No',
+      tone: 'success' as const,
+      icon: <PlayCircle className="h-5 w-5" />,
+    };
+  }, [pendingEnterpriseAction]);
+
   const confirmDenyEnterprise = async () => {
     if (!denyId) return;
     
     setEnterprises(prev => prev.filter(e => e.entrepriseId !== denyId));
     try {
       await ApiService.enterprise.delete(denyId);
+      setIsDenyModalOpen(false);
+      setDenyId('');
     } catch(err) {
       alert("Error: Could not delete.");
       fetchEnterprisesOnly(); 
@@ -820,11 +837,11 @@ export default function Dashboard() {
               {activeTab === 'ENTERPRISES' && (
                 <EnterprisesTable 
                   data={filteredData as Enterprise[]} 
-                  onAccept={handleAcceptEnterprise} 
+                  onAccept={(id) => openEnterpriseActionModal('approve', id)} 
                   onDeny={onDenyClick} 
                   onRecharge={openRecharge}
-                  onSuspend={handleSuspendEnterprise}
-                  onUnsuspend={handleUnsuspendEnterprise}
+                  onSuspend={(id) => openEnterpriseActionModal('suspend', id)}
+                  onUnsuspend={(id) => openEnterpriseActionModal('unsuspend', id)}
                 />
               )}
             </table>
@@ -843,12 +860,28 @@ export default function Dashboard() {
         />
         <DepositModal isOpen={isDepositOpen} onClose={() => setIsDepositOpen(false)} prefilledPhone={depositClientPhone} />
         <ConfirmationModal 
+          isOpen={isEnterpriseActionModalOpen && !!enterpriseActionModalConfig}
+          onClose={closeEnterpriseActionModal}
+          onConfirm={confirmEnterpriseAction}
+          title={enterpriseActionModalConfig?.title || 'Confirm action'}
+          message={enterpriseActionModalConfig?.message || ''}
+          confirmText={enterpriseActionModalConfig?.confirmText}
+          cancelText={enterpriseActionModalConfig?.cancelText}
+          icon={enterpriseActionModalConfig?.icon}
+          tone={enterpriseActionModalConfig?.tone}
+          isLoading={isEnterpriseActionSubmitting}
+        />
+        <ConfirmationModal 
           isOpen={isDenyModalOpen} 
-          onClose={() => setIsDenyModalOpen(false)} 
+          onClose={() => {
+            setIsDenyModalOpen(false);
+            setDenyId('');
+          }} 
           onConfirm={confirmDenyEnterprise}
           title="Reject Enterprise?"
           message="This action will permanently delete the enterprise application. This cannot be undone."
           confirmText="Reject & Delete"
+          tone="danger"
         />
       </div>
     </div>
