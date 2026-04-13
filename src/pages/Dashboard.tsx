@@ -71,9 +71,133 @@ export default function Dashboard() {
     enterpriseEndDate: '',
   });
 
+  const parseNumericValue = (value: unknown): number | null => {
+    if (typeof value === 'number') {
+      return Number.isFinite(value) ? value : null;
+    }
+
+    if (typeof value !== 'string') return null;
+
+    let normalized = value
+      .trim()
+      .replace(/\u00A0/g, '')
+      .replace(/\u202F/g, '')
+      .replace(/\s+/g, '')
+      .replace(/[^\d,.-]/g, '');
+
+    if (!normalized) return null;
+
+    const hasComma = normalized.includes(',');
+    const hasDot = normalized.includes('.');
+
+    if (hasComma && hasDot) {
+      if (normalized.lastIndexOf(',') > normalized.lastIndexOf('.')) {
+        normalized = normalized.replace(/\./g, '').replace(',', '.');
+      } else {
+        normalized = normalized.replace(/,/g, '');
+      }
+    } else if (hasComma) {
+      if (/^\d{1,3}(,\d{3})+$/.test(normalized)) {
+        normalized = normalized.replace(/,/g, '');
+      } else {
+        normalized = normalized.replace(',', '.');
+      }
+    } else if (hasDot) {
+      if (/^\d{1,3}(\.\d{3})+$/.test(normalized)) {
+        normalized = normalized.replace(/\./g, '');
+      }
+    }
+
+    const parsed = Number(normalized);
+    return Number.isFinite(parsed) ? parsed : null;
+  };
+
+  const isRecord = (value: unknown): value is Record<string, unknown> => {
+    return typeof value === 'object' && value !== null;
+  };
+
+  const findBalanceValueDeep = (
+    input: unknown,
+    depth = 0,
+    seen = new Set<object>()
+  ): number | null => {
+    if (!isRecord(input) || depth > 4) return null;
+    if (seen.has(input)) return null;
+    seen.add(input);
+
+    const entries = Object.entries(input);
+
+    for (const [key, value] of entries) {
+      const k = key.toLowerCase();
+      const looksLikeBalance = (k.includes('solde') || k.includes('balance')) && !k.includes('bonus');
+      if (looksLikeBalance) {
+        const parsed = parseNumericValue(value);
+        if (parsed !== null) return parsed;
+      }
+    }
+
+    for (const [, value] of entries) {
+      if (isRecord(value)) {
+        const nested = findBalanceValueDeep(value, depth + 1, seen);
+        if (nested !== null) return nested;
+      }
+    }
+
+    return null;
+  };
+
+  const hasBalanceFieldDeep = (
+    input: unknown,
+    depth = 0,
+    seen = new Set<object>()
+  ): boolean => {
+    if (!isRecord(input) || depth > 4) return false;
+    if (seen.has(input)) return false;
+    seen.add(input);
+
+    const entries = Object.entries(input);
+
+    for (const [key] of entries) {
+      const k = key.toLowerCase();
+      if ((k.includes('solde') || k.includes('balance')) && !k.includes('bonus')) {
+        return true;
+      }
+    }
+
+    for (const [, value] of entries) {
+      if (isRecord(value) && hasBalanceFieldDeep(value, depth + 1, seen)) {
+        return true;
+      }
+    }
+
+    return false;
+  };
+
   const getEnterpriseBalance = (enterprise: any) => {
-    const parsedBalance = Number(enterprise?.solde);
-    return Number.isFinite(parsedBalance) ? parsedBalance : 0;
+    const balanceCandidates = [
+      enterprise?.solde,
+      enterprise?.balance,
+      enterprise?.walletBalance,
+      enterprise?.wallet?.balance,
+      enterprise?.wallet?.solde,
+      enterprise?.compte?.solde,
+      enterprise?.compte?.balance,
+      enterprise?.soldePrincipal,
+    ];
+
+    for (const candidate of balanceCandidates) {
+      const parsed = parseNumericValue(candidate);
+      if (parsed !== null) return parsed;
+    }
+
+    const deepBalance = findBalanceValueDeep(enterprise);
+    if (deepBalance !== null) return deepBalance;
+
+    return 0;
+  };
+
+  const hasEnterpriseBalanceField = (enterprise: any) => {
+    return hasBalanceFieldDeep(enterprise);
   };
 
   const handleEnterpriseRechargeSuccess = async ({
@@ -86,7 +210,7 @@ export default function Dashboard() {
   }) => {
     const responseBalance = getEnterpriseBalance(responseData);
 
-    if (responseData?.solde !== undefined && responseData?.solde !== null && responseData?.solde !== '') {
+    if (hasEnterpriseBalanceField(responseData)) {
       setEnterprises((prev) =>
         prev.map((enterprise) =>
           enterprise.entrepriseId === entrepriseId
