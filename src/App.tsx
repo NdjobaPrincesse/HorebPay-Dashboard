@@ -5,6 +5,9 @@ import { isAuthenticated } from './api/auth';
 // Pages
 import LoginPage from './pages/LoginPage';
 import Dashboard from './pages/Dashboard';       
+import ReceiptPage from './pages/ReceiptPage';
+import ClientReceiptPage from './pages/ClientReceiptPage';
+import ReportPrintPage from './pages/ReportPrintPage';
 
 const App = () => {
   return (
@@ -21,6 +24,9 @@ const App = () => {
         <Route element={<PrivateRoutes />}>
           {/* The Dashboard now contains both Transactions and Clients via Tabs */}
           <Route path="/" element={<Dashboard />} />
+          <Route path="/receipt/:receiptId" element={<ReceiptPage />} />
+          <Route path="/client-receipt/:receiptId" element={<ClientReceiptPage />} />
+          <Route path="/report/:reportId" element={<ReportPrintPage />} />
         </Route>
 
         {/* 3. FALLBACK - Redirect any unknown URL to Dashboard */}

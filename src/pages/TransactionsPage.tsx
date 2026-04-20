@@ -4,8 +4,9 @@ import StatCard from '../components/StatCard';
 import TransactionDetailsModal from '../components/dashboard/TransactionDetailsModal'; 
 import type { Transaction } from '../types';
 import { normalizeStatus } from '../utils/formatters';
+import api from '../api/axios';
+import { extractCollection } from '../api/response';
 
-const GLOBAL_TX_API = "/api/transactions"; 
 const isSuccess = (status: string) => status?.toUpperCase() === 'SUCCESS';
 
 export default function TransactionsPage() {
@@ -20,11 +21,10 @@ export default function TransactionsPage() {
   const fetchTransactions = async () => {
     setLoading(true);
     try {
-      const response = await fetch(GLOBAL_TX_API);
-      if (!response.ok) throw new Error();
-      const rawData = await response.json();
+      const response = await api.get('/transactions');
+      const rawData = extractCollection<any>(response.data);
       
-      const formatted: Transaction[] = Array.isArray(rawData) ? rawData.map((t: any) => ({
+      const formatted: Transaction[] = rawData.map((t: any) => ({
         id: t.transactionsId || Math.random().toString(), // Used for key
         amount: parseFloat(t.montant || 0), 
         date: t.date || new Date().toISOString(),
@@ -43,7 +43,7 @@ export default function TransactionsPage() {
         paymentStatus: normalizeStatus(t.statusPaiement),
         txStatus: normalizeStatus(t.statusTransaction || t.status),
         errorMessage: t.errorMessage
-      })) : [];
+      }));
 
       formatted.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
       setTransactions(formatted);

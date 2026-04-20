@@ -3,6 +3,7 @@ import { Search, RefreshCw, Printer, UserPlus, Eye, EyeOff, Loader2, Calendar, U
 import ClientPrintModal from '../components/ClientPrintModal';
 import api from '../api/axios'; // Use our configured Axios for Auth Tokens
 import type { ClientRow } from '../types';
+import { extractCollection } from '../api/response';
 
 export default function ClientsPage() {
   const [clients, setClients] = useState<ClientRow[]>([]);
@@ -17,11 +18,7 @@ export default function ClientsPage() {
     try {
       // We use 'api' instead of 'fetch' to ensure the Auth Token is sent
       const response = await api.get('/clients');
-      
-      // Handle different response structures (Array vs Page object)
-      const rawData = Array.isArray(response.data) 
-        ? response.data 
-        : (response.data.content || []);
+      const rawData = extractCollection<any>(response.data);
       
       const formatted: ClientRow[] = rawData.map((item: any) => {
         const rawName = `${item.nom || ''} ${item.prenom || ''}`.trim() || item.name || 'Unknown';
@@ -36,7 +33,7 @@ export default function ClientsPage() {
           _rawEmail: item.email || '-',
           displayEmail: '-', // Emails are usually fully hidden in privacy mode
           date: item.createdAt || item.date ? new Date(item.createdAt || item.date).toLocaleDateString() : '-',
-          balance: item.balance || 0,
+          balance: Number(item.balance ?? item.solde ?? 0),
           status: item.email ? 'Active' : 'Guest'
         };
       });
@@ -209,10 +206,12 @@ export default function ClientsPage() {
             id: modalClient.id,
             client: modalClient._rawClient, // We pass raw name to print
             phone: modalClient._rawPhone,   // We pass raw phone to print
-            email: modalClient._rawEmail
+            email: modalClient._rawEmail,
+            date: modalClient.date,
+            balance: modalClient.balance,
+            status: modalClient.status,
           }} 
           onClose={() => setModalClient(null)} 
-          onConfirm={() => window.print()} 
         />
       )}
     </div>

@@ -25,6 +25,9 @@ export const EnterprisesTable = ({
   const [sortKey, setSortKey] = useState<SortKey>(null);
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
 
+  const enterpriseActionButtonClass =
+    'inline-flex min-h-[40px] w-full sm:w-auto items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-xs font-semibold transition-all duration-200';
+
   const handleSort = (key: SortKey) => {
     if (sortKey === key) {
       setSortDirection((prev) => (prev === 'asc' ? 'desc' : 'asc'));
@@ -215,7 +218,7 @@ export const EnterprisesTable = ({
                   <div className="flex flex-col gap-2 items-stretch sm:items-end">
                     <button
                       onClick={() => onRecharge(e.entrepriseId, e.nom)}
-                      className="flex w-full sm:w-auto items-center justify-center gap-1.5 px-3.5 py-2.5 bg-blue-900 text-white rounded-lg text-xs font-medium hover:bg-blue-950"
+                      className={`${enterpriseActionButtonClass} bg-[#1e3a8a] text-white shadow-sm hover:bg-blue-950 hover:shadow-md`}
                     >
                       <Zap className="h-3.5 w-3.5" />
                       Recharge
@@ -223,7 +226,7 @@ export const EnterprisesTable = ({
 
                     <button
                       onClick={() => onSuspend(e.entrepriseId)}
-                      className="flex w-full sm:w-auto items-center justify-center gap-1.5 px-3.5 py-2.5 border border-amber-300 text-amber-700 rounded-lg text-xs font-medium hover:bg-amber-50"
+                      className={`${enterpriseActionButtonClass} border border-amber-200 bg-white text-amber-700 hover:border-amber-300 hover:bg-amber-50`}
                     >
                       <PauseCircle className="h-3.5 w-3.5" />
                       Suspend
@@ -232,7 +235,7 @@ export const EnterprisesTable = ({
                 ) : isSuspended ? (
                   <button
                     onClick={() => onUnsuspend(e.entrepriseId)}
-                    className="flex w-full sm:w-auto items-center justify-center gap-1.5 px-3.5 py-2.5 border border-green-300 text-green-700 rounded-lg text-xs font-medium hover:bg-green-50"
+                    className={`${enterpriseActionButtonClass} border border-emerald-200 bg-white text-emerald-700 hover:border-emerald-300 hover:bg-emerald-50`}
                   >
                     <PlayCircle className="h-3.5 w-3.5" />
                     Unsuspend
@@ -241,7 +244,7 @@ export const EnterprisesTable = ({
                   <div className="flex flex-col gap-2 items-stretch sm:items-end">
                     <button
                       onClick={() => onAccept(e.entrepriseId)}
-                      className="flex w-full sm:w-auto items-center justify-center gap-1.5 px-3.5 py-2.5 bg-blue-900 text-white rounded-lg text-xs font-medium hover:bg-blue-950"
+                      className={`${enterpriseActionButtonClass} bg-[#1e3a8a] text-white shadow-sm hover:bg-blue-950 hover:shadow-md`}
                     >
                       <Check className="h-3.5 w-3.5" />
                       Approve

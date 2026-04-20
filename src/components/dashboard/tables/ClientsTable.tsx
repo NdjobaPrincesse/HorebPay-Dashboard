@@ -24,7 +24,7 @@ export const ClientsTable = ({ data, isPrivacyMode }: Props) => {
 
       <tbody className="divide-y divide-slate-100 text-sm">
         {data.map((c) => (
-          <tr key={c.id} className="hover:bg-amber-50/30 transition-colors">
+          <tr key={c.id || c.clientId} className="hover:bg-amber-50/30 transition-colors">
             {/* Joined */}
             <td className="px-8 py-5 text-left">
               <div className="font-mono text-xs text-slate-500">
@@ -60,7 +60,7 @@ export const ClientsTable = ({ data, isPrivacyMode }: Props) => {
 
             {/* Balance – right aligned, mono */}
             <td className="px-6 py-5 font-mono font-bold text-slate-800 text-right">
-              {isPrivacyMode ? '••••••' : formatCurrency(c.balance || 0)}
+              {isPrivacyMode ? '••••••' : formatCurrency(c.balance ?? c.solde ?? 0)}
             </td>
 
             {/* Bonus – right aligned, mono, amber */}

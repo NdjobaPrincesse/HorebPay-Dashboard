@@ -3,7 +3,7 @@
 
 ## Vue d'ensemble
 
-Le **HorebPay Dashboard** est une application web monopage (SPA) construite avec **React 19 + TypeScript**, déployée sur **Vercel** et connectée à une API **Spring Boot (Java)** hébergée à `http://158.220.104.62:8089/horeb/api`.
+Le **HorebPay Dashboard** est une application web monopage (SPA) construite avec **React 19 + TypeScript**, déployée sur **Vercel** et connectée à une API **Spring Boot (Java)** hébergée à `https://product.horebpay.com/api`.
 
 Elle permet à l'équipe administrative HorebPay de :
 - Consulter et filtrer les **transactions financières**

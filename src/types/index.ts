@@ -11,27 +11,40 @@ export interface Transaction {
   receiverPhone: string;
   amount: number;
   serviceFee: number;
-  bonus: number; 
-  paymentStatus: string; 
+  bonus: number;
+  paymentStatus: string;
   txStatus: string;
   errorMessage?: string | null;
 }
 
 export interface Client {
-  clientId: string;              // backend primary key
-  nom: string | null;            // last name / family name
-  prenom: string | null;         // first name
-  telephone: string;             // phone number
+  clientId: string;
+  nom: string | null;
+  prenom: string | null;
+  telephone: string;
+  phone?: string;
   email: string | null;
-  date: string;                  // creation / joined date (ISO)
-  solde: number;                 // main balance
-  soldeBonus: number;            // bonus balance
-  firstLogin: boolean;           // true if first authentication → force password change
-  // Computed / derived (optional – you can populate these in mapping if needed)
-  name?: string;                 // full name: `${nom} ${prenom}`.trim()
-  status?: string;               // e.g. "Active" or "First Login"
-  // Optional extras if backend sends them
-  id?: string;                   // alias for clientId (if your code uses id)
+  date: string;
+  solde: number;
+  balance?: number;
+  soldeBonus: number;
+  firstLogin: boolean;
+  name?: string;
+  status?: string;
+  id?: string;
+}
+
+export interface ClientRow {
+  id: string;
+  displayClient: string;
+  displayPhone: string;
+  displayEmail: string;
+  _rawClient: string;
+  _rawPhone: string;
+  _rawEmail: string;
+  date: string;
+  balance: number;
+  status: string;
 }
 
 export interface Enterprise {
@@ -52,5 +65,5 @@ export interface Enterprise {
   responsableTelephone: string;
   responsableEmail?: string;
   isValidated?: boolean;
-  raw?: Record<string, any>;     
+  raw?: Record<string, any>;
 }

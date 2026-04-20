@@ -1,40 +1,37 @@
 @import "tailwindcss";
 
+@page {
+  size: A4;
+  margin: 12mm;
+}
+
 /* ... existing tailwind imports ... */
 
 @media print {
-  /* 1. Hide EVERYTHING by default */
   body * {
     visibility: hidden;
   }
 
-  /* 2. Show ONLY the Receipt */
   #printable-receipt, #printable-receipt * {
     visibility: visible;
   }
 
-  /* 3. Position the receipt at the top of the paper */
   #printable-receipt {
     position: absolute;
     left: 0;
     top: 0;
     width: 100%;
-    margin: 0;
-    padding: 20px;
+    max-width: none;
+    margin: 0 auto;
+    padding: 0;
     background: white;
   }
 
-  /* 4. Hide scrollbars and backgrounds */
   body {
     background: white;
     overflow: hidden; 
   }
-}
 
-/* src/index.css */
-
-@media print {
-  /* HIDE EVERYTHING by default */
   .no-print, 
   button, 
   input, 
@@ -44,7 +41,6 @@
     display: none !important;
   }
 
-  /* SHOW only specific areas */
   body, #root, .print-area {
     visibility: visible;
     background-color: white !important;
@@ -57,7 +53,6 @@
     padding: 0;
   }
 
-  /* Table Adjustments for Print */
   table {
     width: 100% !important;
     border-collapse: collapse;
@@ -70,19 +65,19 @@
     color: black !important;
   }
 
-  /* Hide scrollbars */
   .overflow-x-auto {
     overflow: visible !important;
   }
 
-  /* Force Background Colors (for Status Badges) */
   * {
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
   }
-}
 
-/* Modal Specific Print Styles */
-.receipt-modal-content {
-  background: white;
+  .print-page-avoid-break,
+  section,
+  tr {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
 }

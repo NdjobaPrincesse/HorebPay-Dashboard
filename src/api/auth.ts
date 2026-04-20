@@ -11,7 +11,8 @@ export const login = async (userName: string, password: string) => {
   console.log("Login Response:", response.data);
 
   // 1. EXTRACT USER ID
-  const { userId, message } = response.data;
+  const { userId, token, accessToken, message } = response.data;
+  const authToken = token || accessToken;
 
   if (userId || response.status === 200) {
     const validId = userId || 'unknown-id';
@@ -21,8 +22,10 @@ export const login = async (userName: string, password: string) => {
     localStorage.setItem('clientInitiator', validId); 
     
     // Store standard auth flags
-    localStorage.setItem
     localStorage.setItem('userId', validId);
+    if (authToken) {
+      localStorage.setItem('token', authToken);
+    }
     localStorage.setItem('user', JSON.stringify({ userName, userId: validId }));
     
     return response.data;

@@ -8,6 +8,7 @@ import { ApiService } from '../api/services';
 import { logout } from '../api/auth';
 import type { Transaction, Client, Enterprise } from '../types';
 import { formatCurrency, cleanStr, normalizeStatus } from '../utils/formatters';
+import { extractCollection } from '../api/response';
 
 // COMPONENTS
 import TransactionReceipt from '../components/TransactionReceipt';
@@ -15,6 +16,7 @@ import LogoutModal from '../components/LogoutModal';
 import EnterpriseRechargeModal from '../components/EnterpriseRechargeModal';
 import DepositModal from '../components/DepositModal';
 import ConfirmationModal from '../components/ConfirmationModal';
+import { storeReportPayload } from '../utils/receiptStorage';
 import { KPICard } from '../components/dashboard/ui/KPICard';
 import { TabButton } from '../components/dashboard/ui/TabButton';
 import { ActionIconBtn } from '../components/dashboard/ui/ActionIconBtn';
@@ -67,6 +69,14 @@ export default function Dashboard() {
     maxAmount: '',
     txStatus: 'ALL',
     paymentStatus: 'ALL',
+    clientName: '',
+    clientNumber: '',
+    clientStatus: 'ALL',
+    enterpriseName: '',
+    enterpriseLocation: '',
+    enterpriseStatus: 'ALL',
+    enterpriseMinBalance: '',
+    enterpriseMaxBalance: '',
     enterpriseStartDate: '',
     enterpriseEndDate: '',
   });
@@ -235,7 +245,7 @@ export default function Dashboard() {
 
       if (txRes.status === 'fulfilled') {
         const rawData = txRes.value.data;
-        const txData = Array.isArray(rawData) ? rawData : (rawData.content || []);
+        const txData = extractCollection<any>(rawData);
         setTransactions(
           txData.map((t: any) => ({
             id: t.transactionsId || t.id,
@@ -262,17 +272,20 @@ export default function Dashboard() {
 
       if (clientsRes.status === 'fulfilled') {
         const rawData = clientsRes.value.data;
-        const clientsData = Array.isArray(rawData) ? rawData : (rawData.content || []);
+        const clientsData = extractCollection<any>(rawData);
         setClients(
           clientsData.map((c: any) => ({
+            id: c.clientId || c.id,
             clientId: c.clientId || c.id,
             nom: c.nom || '',
             prenom: c.prenom || '',
             phone: c.telephone || 'N/A',
             email: c.email || 'N/A',
             date: c.date || c.createdAt,
+            telephone: c.telephone || 'N/A',
             solde: parseFloat(c.solde || 0),
             soldeBonus: parseFloat(c.soldeBonus || 0),
+            balance: parseFloat(c.balance ?? c.solde ?? 0),
             firstLogin: c.firstLogin ?? true,
             name: [c.nom, c.prenom].filter(Boolean).join(' ').trim() || 'Unknown',
             status: c.firstLogin ? 'First Login' : 'Active',
@@ -285,7 +298,7 @@ export default function Dashboard() {
 
       if (entRes.status === 'fulfilled') {
         const rawData = entRes.value.data;
-        const entData = Array.isArray(rawData) ? rawData : (rawData.content || []);
+        const entData = extractCollection<any>(rawData);
 
         console.log('[RAW ENTERPRISES FROM API]', entData);
 
@@ -357,7 +370,7 @@ export default function Dashboard() {
     try {
       const txRes = await ApiService.dashboard.getTransactions();
       const rawData = txRes.data;
-      const txData = Array.isArray(rawData) ? rawData : (rawData.content || []);
+      const txData = extractCollection<any>(rawData);
       setTransactions(
         txData.map((t: any) => ({
           id: t.transactionsId || t.id,
@@ -392,17 +405,20 @@ export default function Dashboard() {
     try {
       const clientsRes = await ApiService.dashboard.getClients();
       const rawData = clientsRes.data;
-      const clientsData = Array.isArray(rawData) ? rawData : (rawData.content || []);
+      const clientsData = extractCollection<any>(rawData);
       setClients(
         clientsData.map((c: any) => ({
+          id: c.clientId || c.id,
           clientId: c.clientId || c.id,
           nom: c.nom || '',
           prenom: c.prenom || '',
           phone: c.telephone || 'N/A',
           email: c.email || 'N/A',
           date: c.date || c.createdAt,
+          telephone: c.telephone || 'N/A',
           solde: parseFloat(c.solde || 0),
           soldeBonus: parseFloat(c.soldeBonus || 0),
+          balance: parseFloat(c.balance ?? c.solde ?? 0),
           firstLogin: c.firstLogin ?? true,
           name: [c.nom, c.prenom].filter(Boolean).join(' ').trim() || 'Unknown',
           status: c.firstLogin ? 'First Login' : 'Active',
@@ -423,7 +439,7 @@ export default function Dashboard() {
     try {
       const entRes = await ApiService.enterprise.getAll();
       const rawData = entRes.data;
-      const entData = Array.isArray(rawData) ? rawData : (rawData.content || []);
+      const entData = extractCollection<any>(rawData);
 
       setEnterprises(
         entData.map((e: any): Enterprise => ({
@@ -690,10 +706,31 @@ export default function Dashboard() {
         return true;
       });
     } else if (activeTab === 'CLIENTS') {
-      return clients.filter(c => !searchTerms || cleanStr(c.name).includes(searchTerms));
+      return clients.filter(c => {
+        const fullName = c.name || `${c.nom || ''} ${c.prenom || ''}`.trim();
+        const phone = c.phone || c.telephone || '';
+        const status = c.status || 'Active';
+
+        if (searchTerms && !cleanStr(fullName).includes(searchTerms) && !cleanStr(phone).includes(searchTerms)) return false;
+        if (filters.clientName && !cleanStr(fullName).includes(cleanStr(filters.clientName))) return false;
+        if (filters.clientNumber && !cleanStr(phone).includes(cleanStr(filters.clientNumber))) return false;
+        if (filters.clientStatus !== 'ALL' && status !== filters.clientStatus) return false;
+
+        return true;
+      });
     } else { // ENTERPRISES
       return enterprises.filter(e => {
-        if (searchTerms && !cleanStr(e.nom).includes(searchTerms)) return false;
+        if (
+          searchTerms &&
+          !cleanStr(e.nom).includes(searchTerms) &&
+          !cleanStr(e.lieu).includes(searchTerms) &&
+          !cleanStr(`${e.responsableNom || ''} ${e.responsablePrenom || ''}`).includes(searchTerms)
+        ) return false;
+        if (filters.enterpriseName && !cleanStr(e.nom).includes(cleanStr(filters.enterpriseName))) return false;
+        if (filters.enterpriseLocation && !cleanStr(e.lieu).includes(cleanStr(filters.enterpriseLocation))) return false;
+        if (filters.enterpriseStatus !== 'ALL' && e.status !== filters.enterpriseStatus) return false;
+        if (filters.enterpriseMinBalance && e.solde < Number(filters.enterpriseMinBalance)) return false;
+        if (filters.enterpriseMaxBalance && e.solde > Number(filters.enterpriseMaxBalance)) return false;
 
         if (filters.enterpriseStartDate || filters.enterpriseEndDate) {
           const entDate = new Date(e.dateCreationEntreprise).getTime();
@@ -740,7 +777,27 @@ export default function Dashboard() {
   );
 
   const exportCSV = () => { alert("Export feature available."); };
-  const handlePrintList = () => { window.print(); };
+
+  const handlePrintList = () => {
+    const appliedFilters = Object.entries(filters)
+      .filter(([, value]) => value !== '' && value !== 'ALL')
+      .map(([key, value]) => `${key}: ${value}`);
+
+    const reportId = storeReportPayload({
+      title:
+        activeTab === 'TRANSACTIONS'
+          ? 'Transactions Report'
+          : activeTab === 'CLIENTS'
+            ? 'Customers Report'
+            : 'Enterprises Report',
+      tab: activeTab,
+      generatedAt: new Date().toISOString(),
+      filters: appliedFilters,
+      records: filteredData,
+    });
+
+    window.open(`/report/${encodeURIComponent(reportId)}`, '_blank', 'noopener,noreferrer');
+  };
 
   const resetFilters = () => setFilters({
     startDate: '',
@@ -752,6 +809,14 @@ export default function Dashboard() {
     maxAmount: '',
     txStatus: 'ALL',
     paymentStatus: 'ALL',
+    clientName: '',
+    clientNumber: '',
+    clientStatus: 'ALL',
+    enterpriseName: '',
+    enterpriseLocation: '',
+    enterpriseStatus: 'ALL',
+    enterpriseMinBalance: '',
+    enterpriseMaxBalance: '',
     enterpriseStartDate: '',
     enterpriseEndDate: '',
   });
@@ -852,7 +917,13 @@ export default function Dashboard() {
               <Search className="absolute left-5 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400" />
               <input 
                 type="text" 
-                placeholder={activeTab === 'TRANSACTIONS' ? "Search by Reference, Client, Method..." : "Search by Name, Phone..."}
+                placeholder={
+                  activeTab === 'TRANSACTIONS'
+                    ? 'Search by Reference, Client, Method...'
+                    : activeTab === 'CLIENTS'
+                      ? 'Quick search by name or number...'
+                      : 'Quick search by company, manager or location...'
+                }
                 className="w-full pl-14 pr-4 py-4 bg-[#F8FAFB] border-transparent rounded-2xl text-sm font-semibold text-[#1e3a8a] placeholder-slate-400 outline-none focus:bg-white focus:ring-2 focus:ring-[#1e3a8a]/10 transition-all" 
                 value={filters.searchQuery} 
                 onChange={(e) => setFilters({...filters, searchQuery: e.target.value})} 
@@ -882,6 +953,29 @@ export default function Dashboard() {
               {activeTab === 'TRANSACTIONS' ? (
                 <>
                   <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider pl-1">Amount Range</label>
+                    <div className="flex flex-col sm:flex-row gap-2 items-stretch sm:items-center bg-[#F8FAFB] p-1 rounded-2xl border border-transparent hover:border-slate-200 transition-all">
+                      <input
+                        type="number"
+                        min="0"
+                        placeholder="Min"
+                        className="w-full bg-transparent text-sm font-bold text-[#1e3a8a] px-4 py-2 outline-none"
+                        value={filters.minAmount}
+                        onChange={(e) => setFilters({...filters, minAmount: e.target.value})}
+                      />
+                      <span className="text-slate-300">→</span>
+                      <input
+                        type="number"
+                        min="0"
+                        placeholder="Max"
+                        className="w-full bg-transparent text-sm font-bold text-[#1e3a8a] px-4 py-2 outline-none"
+                        value={filters.maxAmount}
+                        onChange={(e) => setFilters({...filters, maxAmount: e.target.value})}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-1">
                     <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider pl-1">Tx Status</label>
                     <div className="relative">
                       <select
@@ -890,6 +984,23 @@ export default function Dashboard() {
                         onChange={(val) => setFilters({...filters, txStatus: val.target.value})}
                       >
                         <option value="ALL">All Statuses</option>
+                        <option value="SUCCESS">Success</option>
+                        <option value="FAILED">Failed</option>
+                        <option value="PENDING">Pending</option>
+                      </select>
+                      <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 pointer-events-none"/>
+                    </div>
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider pl-1">Payment Status</label>
+                    <div className="relative">
+                      <select
+                        className="w-full px-4 py-3 bg-[#F8FAFB] hover:bg-white border border-transparent hover:border-slate-200 rounded-2xl text-sm font-bold text-[#1e3a8a] appearance-none outline-none focus:ring-2 focus:ring-[#1e3a8a]/10 transition-all cursor-pointer"
+                        value={filters.paymentStatus}
+                        onChange={(e) => setFilters({...filters, paymentStatus: e.target.value})}
+                      >
+                        <option value="ALL">All Payments</option>
                         <option value="SUCCESS">Success</option>
                         <option value="FAILED">Failed</option>
                         <option value="PENDING">Pending</option>
@@ -917,8 +1028,109 @@ export default function Dashboard() {
                     </div>
                   </div>
                 </>
+              ) : activeTab === 'CLIENTS' ? (
+                <>
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider pl-1">Name</label>
+                    <input
+                      type="text"
+                      placeholder="Customer name"
+                      className="w-full px-4 py-3 bg-[#F8FAFB] border border-transparent hover:border-slate-200 rounded-2xl text-sm font-bold text-[#1e3a8a] outline-none focus:bg-white focus:ring-2 focus:ring-[#1e3a8a]/10 transition-all"
+                      value={filters.clientName}
+                      onChange={(e) => setFilters({...filters, clientName: e.target.value})}
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider pl-1">Number</label>
+                    <input
+                      type="text"
+                      placeholder="Phone number"
+                      className="w-full px-4 py-3 bg-[#F8FAFB] border border-transparent hover:border-slate-200 rounded-2xl text-sm font-bold text-[#1e3a8a] outline-none focus:bg-white focus:ring-2 focus:ring-[#1e3a8a]/10 transition-all"
+                      value={filters.clientNumber}
+                      onChange={(e) => setFilters({...filters, clientNumber: e.target.value})}
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider pl-1">Status</label>
+                    <div className="relative">
+                      <select
+                        className="w-full px-4 py-3 bg-[#F8FAFB] hover:bg-white border border-transparent hover:border-slate-200 rounded-2xl text-sm font-bold text-[#1e3a8a] appearance-none outline-none focus:ring-2 focus:ring-[#1e3a8a]/10 transition-all cursor-pointer"
+                        value={filters.clientStatus}
+                        onChange={(e) => setFilters({...filters, clientStatus: e.target.value})}
+                      >
+                        <option value="ALL">All Statuses</option>
+                        <option value="Active">Active</option>
+                        <option value="First Login">First Login</option>
+                      </select>
+                      <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 pointer-events-none"/>
+                    </div>
+                  </div>
+                </>
               ) : activeTab === 'ENTERPRISES' ? (
                 <>
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider pl-1">Company Name</label>
+                    <input
+                      type="text"
+                      placeholder="Company name"
+                      className="w-full px-4 py-3 bg-[#F8FAFB] border border-transparent hover:border-slate-200 rounded-2xl text-sm font-bold text-[#1e3a8a] outline-none focus:bg-white focus:ring-2 focus:ring-[#1e3a8a]/10 transition-all"
+                      value={filters.enterpriseName}
+                      onChange={(e) => setFilters({...filters, enterpriseName: e.target.value})}
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider pl-1">Location</label>
+                    <input
+                      type="text"
+                      placeholder="Location"
+                      className="w-full px-4 py-3 bg-[#F8FAFB] border border-transparent hover:border-slate-200 rounded-2xl text-sm font-bold text-[#1e3a8a] outline-none focus:bg-white focus:ring-2 focus:ring-[#1e3a8a]/10 transition-all"
+                      value={filters.enterpriseLocation}
+                      onChange={(e) => setFilters({...filters, enterpriseLocation: e.target.value})}
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider pl-1">Status</label>
+                    <div className="relative">
+                      <select
+                        className="w-full px-4 py-3 bg-[#F8FAFB] hover:bg-white border border-transparent hover:border-slate-200 rounded-2xl text-sm font-bold text-[#1e3a8a] appearance-none outline-none focus:ring-2 focus:ring-[#1e3a8a]/10 transition-all cursor-pointer"
+                        value={filters.enterpriseStatus}
+                        onChange={(e) => setFilters({...filters, enterpriseStatus: e.target.value})}
+                      >
+                        <option value="ALL">All Statuses</option>
+                        <option value="STATUT_VALIDATED">Approved</option>
+                        <option value="SUSPEND">Suspended</option>
+                        <option value="STATUT_REJECTED">Rejected</option>
+                        <option value="PENDING">Pending</option>
+                      </select>
+                      <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 pointer-events-none"/>
+                    </div>
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider pl-1">Balance Range</label>
+                    <div className="flex flex-col sm:flex-row gap-2 items-stretch sm:items-center bg-[#F8FAFB] p-1 rounded-2xl border border-transparent hover:border-slate-200 transition-all">
+                      <input
+                        type="number"
+                        placeholder="Min"
+                        className="w-full bg-transparent text-sm font-bold text-[#1e3a8a] px-4 py-2 outline-none"
+                        value={filters.enterpriseMinBalance}
+                        onChange={(e) => setFilters({...filters, enterpriseMinBalance: e.target.value})}
+                      />
+                      <span className="text-slate-300">→</span>
+                      <input
+                        type="number"
+                        placeholder="Max"
+                        className="w-full bg-transparent text-sm font-bold text-[#1e3a8a] px-4 py-2 outline-none"
+                        value={filters.enterpriseMaxBalance}
+                        onChange={(e) => setFilters({...filters, enterpriseMaxBalance: e.target.value})}
+                      />
+                    </div>
+                  </div>
+
                   <div className="space-y-1 sm:col-span-2">
                     <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider pl-1">Creation Date Range</label>
                     <div className="flex flex-col sm:flex-row gap-2 items-stretch sm:items-center bg-[#F8FAFB] p-1 rounded-2xl border border-transparent hover:border-slate-200 transition-all">
