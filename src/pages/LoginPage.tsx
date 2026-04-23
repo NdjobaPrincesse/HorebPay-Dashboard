@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Mail, Lock, Loader2, ArrowRight } from 'lucide-react';
-import { login } from '../api/auth'; 
+import { getDefaultRoute, login } from '../api/auth'; 
 
 const LoginPage = () => {
   // LOGIC UPDATE: Backend requires 'userName', so we track username, not email
@@ -17,9 +17,7 @@ const LoginPage = () => {
     try {
       // API CALL: Sends 'userName' and 'password' via src/api/auth.ts
       await login(username, password);
-      
-      // REDIRECT: On success, reload to Dashboard
-      window.location.href = '/';
+      window.location.href = getDefaultRoute();
     } catch (err: any) {
       console.error("Login Failed:", err);
       

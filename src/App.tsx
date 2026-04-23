@@ -1,6 +1,6 @@
 import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate, Outlet } from 'react-router-dom';
-import { isAuthenticated } from './api/auth';
+import { getDefaultRoute, isAuthenticated } from './api/auth';
 
 // Pages
 import LoginPage from './pages/LoginPage';
@@ -8,6 +8,7 @@ import Dashboard from './pages/Dashboard';
 import ReceiptPage from './pages/ReceiptPage';
 import ClientReceiptPage from './pages/ClientReceiptPage';
 import ReportPrintPage from './pages/ReportPrintPage';
+import AgentDashboard from './pages/AgentDashboard';
 
 const App = () => {
   return (
@@ -17,20 +18,22 @@ const App = () => {
         {/* If user is already logged in, redirect them to Dashboard immediately */}
         <Route 
           path="/login" 
-          element={isAuthenticated() ? <Navigate to="/" replace /> : <LoginPage />} 
+          element={isAuthenticated() ? <Navigate to={getDefaultRoute()} replace /> : <LoginPage />} 
         />
 
         {/* 2. PROTECTED ROUTES (Private) */}
         <Route element={<PrivateRoutes />}>
           {/* The Dashboard now contains both Transactions and Clients via Tabs */}
           <Route path="/" element={<Dashboard />} />
+          <Route path="/agent" element={<AgentDashboard />} />
+          <Route path="/agent/report" element={<AgentDashboard />} />
           <Route path="/receipt/:receiptId" element={<ReceiptPage />} />
           <Route path="/client-receipt/:receiptId" element={<ClientReceiptPage />} />
           <Route path="/report/:reportId" element={<ReportPrintPage />} />
         </Route>
 
         {/* 3. FALLBACK - Redirect any unknown URL to Dashboard */}
-        <Route path="*" element={<Navigate to="/" replace />} />
+        <Route path="*" element={<Navigate to={getDefaultRoute()} replace />} />
       </Routes>
     </BrowserRouter>
   );

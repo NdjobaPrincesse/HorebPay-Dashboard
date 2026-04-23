@@ -9,6 +9,7 @@ import { logout } from '../api/auth';
 import type { Transaction, Client, Enterprise } from '../types';
 import { formatCurrency, cleanStr, normalizeStatus } from '../utils/formatters';
 import { extractCollection } from '../api/response';
+import { exportTransactionsPdf } from '../utils/exportTransactionsPdf';
 
 // COMPONENTS
 import TransactionReceipt from '../components/TransactionReceipt';
@@ -776,7 +777,14 @@ export default function Dashboard() {
     [revenueDisplay.amount]
   );
 
-  const exportCSV = () => { alert("Export feature available."); };
+  const handleExportPdf = () => {
+    if (activeTab !== 'TRANSACTIONS') {
+      window.alert('PDF export is currently available for transactions only.');
+      return;
+    }
+
+    exportTransactionsPdf(filteredData as Transaction[]);
+  };
 
   const handlePrintList = () => {
     const appliedFilters = Object.entries(filters)
@@ -858,6 +866,7 @@ export default function Dashboard() {
 
               <div className="h-8 w-\[1px\] bg-slate-200 mx-2 hidden sm:block"></div>
               
+              <ActionIconBtn onClick={handleExportPdf} icon={<Download className="h-4 w-4"/>} title="Export PDF" />
               <ActionIconBtn onClick={handlePrintList} icon={<Printer className="h-4 w-4"/>} title="Print" />
               <ActionIconBtn onClick={() => setIsPrivacyMode(!isPrivacyMode)} icon={isPrivacyMode ? <EyeOff className="h-4 w-4"/> : <Eye className="h-4 w-4"/>} title="Privacy" active={isPrivacyMode} />
               <ActionIconBtn onClick={refreshActiveTab} icon={<RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />} title="Refresh" />
